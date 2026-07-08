@@ -175,6 +175,23 @@ namespace LogAnalyzer
             }
         }
 
+        private void CopyAll_Click(object sender, RoutedEventArgs e)
+        {
+            var entries = GetSelectedEntries();
+            if (entries.Count == 0) return;
+            var text = string.Join(Environment.NewLine, entries.Select(x =>
+                $"{x.LineNumber}\t{x.TimestampDisplay}\t{x.LevelDisplay}\t{x.Source}\t{x.FileName}\t{x.Message}"));
+            Clipboard.SetText(text);
+        }
+
+        private void CopyMessage_Click(object sender, RoutedEventArgs e)
+        {
+            var entries = GetSelectedEntries();
+            if (entries.Count == 0) return;
+            var text = string.Join(Environment.NewLine, entries.Select(x => x.Message));
+            Clipboard.SetText(text);
+        }
+
         private System.Collections.Generic.List<LogEntry> GetSelectedEntries()
         {
             var selected = new System.Collections.Generic.HashSet<LogEntry>();

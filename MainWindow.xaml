@@ -560,6 +560,12 @@
                                       SelectionChanged="AnyLogList_SelectionChanged"
                                       BorderThickness="0,0,0,0"
                                       Visibility="{Binding IsSingleMode, Converter={StaticResource BoolToVis}}">
+                                <ListView.ContextMenu>
+                                    <ContextMenu>
+                                        <MenuItem Header="전체 복사" Click="CopyAll_Click"/>
+                                        <MenuItem Header="메시지만 복사" Click="CopyMessage_Click"/>
+                                    </ContextMenu>
+                                </ListView.ContextMenu>
                                 <ListView.View>
                                     <GridView>
                                         <GridViewColumn Header="#" Width="55">
@@ -660,6 +666,12 @@
                                                   SelectionMode="Extended"
                                                   SelectionChanged="AnyLogList_SelectionChanged"
                                                   BorderThickness="0">
+                                            <ListView.ContextMenu>
+                                                <ContextMenu>
+                                                    <MenuItem Header="전체 복사" Click="CopyAll_Click"/>
+                                                    <MenuItem Header="메시지만 복사" Click="CopyMessage_Click"/>
+                                                </ContextMenu>
+                                            </ListView.ContextMenu>
                                             <ListView.View>
                                                 <GridView>
                                                     <GridViewColumn Header="시각" Width="90" DisplayMemberBinding="{Binding TimestampDisplay}"/>
@@ -709,6 +721,12 @@
                                                   SelectionMode="Extended"
                                                   SelectionChanged="AnyLogList_SelectionChanged"
                                                   BorderThickness="0">
+                                            <ListView.ContextMenu>
+                                                <ContextMenu>
+                                                    <MenuItem Header="전체 복사" Click="CopyAll_Click"/>
+                                                    <MenuItem Header="메시지만 복사" Click="CopyMessage_Click"/>
+                                                </ContextMenu>
+                                            </ListView.ContextMenu>
                                             <ListView.View>
                                                 <GridView>
                                                     <GridViewColumn Header="시각" Width="90" DisplayMemberBinding="{Binding TimestampDisplay}"/>
