@@ -1,0 +1,12 @@
+<UserControl x:Class="LogAnalyzer.TimelineChart"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid>
+        <Canvas x:Name="ChartCanvas" ClipToBounds="True"
+                Background="{DynamicResource SurfaceBrush}"/>
+        <TextBlock x:Name="EmptyLabel" Text="데이터 없음"
+                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                   Foreground="{DynamicResource ForegroundMutedBrush}" FontSize="12"
+                   Visibility="Collapsed"/>
+    </Grid>
+</UserControl>
