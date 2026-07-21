@@ -23,6 +23,7 @@
         <local:DoubleToPercentStringConverter x:Key="DoubleToPercent"/>
         <local:PercentToWidthConverter x:Key="PercentToWidth"/>
         <local:DragOverBrushConverter x:Key="DragOverBrush"/>
+        <local:PathToFileNameConverter x:Key="PathToFileName"/>
 
         <!-- Button Style -->
         <Style x:Key="PrimaryButton" TargetType="Button">
@@ -114,7 +115,7 @@
             <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Auto"/>
             <Setter Property="VirtualizingStackPanel.IsVirtualizing" Value="True"/>
             <Setter Property="VirtualizingStackPanel.VirtualizationMode" Value="Recycling"/>
-            <Setter Property="ScrollViewer.IsDeferredScrollingEnabled" Value="True"/>
+            <Setter Property="ScrollViewer.IsDeferredScrollingEnabled" Value="False"/>
         </Style>
 
         <Style x:Key="LogListViewItem" TargetType="ListViewItem">
@@ -497,55 +498,124 @@
                                                 <Run Text="건"/>
                                             </TextBlock>
                                         </Border>
+                                        <ItemsControl ItemsSource="{Binding LoadedFiles}" Margin="10,0,0,0"
+                                                      VerticalAlignment="Center">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <StackPanel Orientation="Horizontal"/>
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding Converter={StaticResource PathToFileName}}"
+                                                               FontSize="11"
+                                                               Foreground="{DynamicResource ForegroundMutedBrush}"
+                                                               Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
                                     </StackPanel>
-                                    <TextBlock Text="Ctrl+F 키워드 검색  |  Ctrl+Shift+F 전문 검색  |  Ctrl+O 열기  |  목록: Ctrl/Shift 다중 선택 후 상단 «선택 CSV/TXT»"
-                                               HorizontalAlignment="Right" FontSize="11"
-                                               Foreground="{DynamicResource ForegroundMutedBrush}"
-                                               VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
                                 </Grid>
 
-                                <!-- FilterChip 칩 목록 -->
-                                <ItemsControl ItemsSource="{Binding FilterChips}"
-                                              Visibility="{Binding FilterChips.Count, Converter={StaticResource IntGtZeroToVis}}">
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                            <WrapPanel Orientation="Horizontal"/>
-                                        </ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Border Background="{DynamicResource AccentBrush}"
-                                                    CornerRadius="10" Margin="0,0,4,4" Padding="8,2">
-                                                <StackPanel Orientation="Horizontal">
-                                                    <TextBlock Text="{Binding Keyword}"
-                                                               Foreground="White" FontSize="11"
-                                                               VerticalAlignment="Center"/>
-                                                    <Button Content="×"
-                                                            Command="{Binding RemoveCommand}"
-                                                            Background="Transparent" BorderThickness="0"
-                                                            Foreground="White" FontSize="13"
-                                                            Padding="4,0,0,0" Cursor="Hand"
-                                                            VerticalAlignment="Center"/>
-                                                </StackPanel>
-                                            </Border>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-
                                 <!-- 키워드 입력 + 추가 버튼 -->
-                                <DockPanel>
-                                    <Button DockPanel.Dock="Right" Content="+"
-                                            Command="{Binding AddFilterChipCommand}"
-                                            Style="{StaticResource SecondaryButton}"
-                                            Padding="10,3" Margin="6,0,0,0" FontSize="14" FontWeight="Bold"
-                                            ToolTip="키워드를 필터 칩으로 추가 (Enter)"/>
-                                    <TextBox x:Name="FilterChipSearchBox"
-                                             Text="{Binding SearchKeyword, UpdateSourceTrigger=PropertyChanged}"
-                                             Style="{StaticResource SearchBox}"
-                                             Tag="포함 키워드 검색 (Enter 또는 + 로 칩 추가)"
-                                             ToolTip="메시지 또는 소스에 포함된 항목만 표시. Enter 또는 + 버튼으로 칩 추가"
-                                             KeyDown="FilterChipSearchBox_KeyDown"/>
-                                </DockPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- 포함 칩 + 입력 -->
+                                    <StackPanel Grid.Column="0" Margin="0,0,4,0">
+                                        <TextBlock Text="포함 필터" FontSize="11" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource ForegroundMutedBrush}"
+                                                   Margin="0,0,0,4"/>
+                                        <ItemsControl ItemsSource="{Binding FilterChips}"
+                                                      Visibility="{Binding FilterChips.Count, Converter={StaticResource IntGtZeroToVis}}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <WrapPanel Orientation="Horizontal"/>
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border Background="{DynamicResource AccentBrush}"
+                                                            CornerRadius="10" Margin="0,0,4,4" Padding="8,2">
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <TextBlock Text="{Binding Keyword}"
+                                                                       Foreground="White" FontSize="11"
+                                                                       VerticalAlignment="Center"/>
+                                                            <Button Content="×"
+                                                                    Command="{Binding RemoveCommand}"
+                                                                    Background="Transparent" BorderThickness="0"
+                                                                    Foreground="White" FontSize="13"
+                                                                    Padding="4,0,0,0" Cursor="Hand"
+                                                                    VerticalAlignment="Center"/>
+                                                        </StackPanel>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        <DockPanel>
+                                            <Button DockPanel.Dock="Right" Content="+"
+                                                    Command="{Binding AddFilterChipCommand}"
+                                                    Style="{StaticResource SecondaryButton}"
+                                                    Padding="10,3" Margin="6,0,0,0" FontSize="14" FontWeight="Bold"
+                                                    ToolTip="키워드를 필터 칩으로 추가 (Enter)"/>
+                                            <TextBox x:Name="FilterChipSearchBox"
+                                                     Text="{Binding SearchKeyword, UpdateSourceTrigger=PropertyChanged}"
+                                                     Style="{StaticResource SearchBox}"
+                                                     Tag="포함"
+                                                     ToolTip="메시지 또는 소스에 포함된 항목만 표시. Enter 또는 + 버튼으로 칩 추가"
+                                                     KeyDown="FilterChipSearchBox_KeyDown"/>
+                                        </DockPanel>
+                                    </StackPanel>
+
+                                    <!-- 제외 칩 + 입력 -->
+                                    <StackPanel Grid.Column="1" Margin="4,0,0,0">
+                                        <TextBlock Text="제외 필터" FontSize="11" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource ForegroundMutedBrush}"
+                                                   Margin="0,0,0,4"/>
+                                        <ItemsControl ItemsSource="{Binding ExcludeChips}"
+                                                      Visibility="{Binding ExcludeChips.Count, Converter={StaticResource IntGtZeroToVis}}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <WrapPanel Orientation="Horizontal"/>
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border Background="{DynamicResource ErrorBrush}"
+                                                            CornerRadius="10" Margin="0,0,4,4" Padding="8,2">
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <TextBlock Text="{Binding Keyword}"
+                                                                       Foreground="White" FontSize="11"
+                                                                       VerticalAlignment="Center"/>
+                                                            <Button Content="×"
+                                                                    Command="{Binding RemoveCommand}"
+                                                                    Background="Transparent" BorderThickness="0"
+                                                                    Foreground="White" FontSize="13"
+                                                                    Padding="4,0,0,0" Cursor="Hand"
+                                                                    VerticalAlignment="Center"/>
+                                                        </StackPanel>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        <DockPanel>
+                                            <Button DockPanel.Dock="Right" Content="+"
+                                                    Command="{Binding AddExcludeChipCommand}"
+                                                    Style="{StaticResource SecondaryButton}"
+                                                    Padding="10,3" Margin="6,0,0,0" FontSize="14" FontWeight="Bold"
+                                                    ToolTip="제외 키워드를 칩으로 추가 (Enter)"/>
+                                            <TextBox x:Name="ExcludeChipSearchBox"
+                                                     Text="{Binding ExcludeKeyword, UpdateSourceTrigger=PropertyChanged}"
+                                                     Style="{StaticResource SearchBox}"
+                                                     Tag="제외"
+                                                     ToolTip="입력한 문자열이 포함된 메시지는 목록에서 숨깁니다. Enter 또는 + 버튼으로 칩 추가"
+                                                     KeyDown="ExcludeChipSearchBox_KeyDown"/>
+                                        </DockPanel>
+                                    </StackPanel>
+                                </Grid>
                             </StackPanel>
                         </Border>
 
@@ -605,16 +675,6 @@
                                                 <DataTemplate>
                                                     <TextBlock Text="{Binding Source}"
                                                                Foreground="{DynamicResource AccentBrush}"
-                                                               FontSize="11" Padding="4,3"
-                                                               TextTrimming="CharacterEllipsis"/>
-                                                </DataTemplate>
-                                            </GridViewColumn.CellTemplate>
-                                        </GridViewColumn>
-                                        <GridViewColumn Header="파일" Width="110">
-                                            <GridViewColumn.CellTemplate>
-                                                <DataTemplate>
-                                                    <TextBlock Text="{Binding FileName}"
-                                                               Foreground="{DynamicResource ForegroundMutedBrush}"
                                                                FontSize="11" Padding="4,3"
                                                                TextTrimming="CharacterEllipsis"/>
                                                 </DataTemplate>

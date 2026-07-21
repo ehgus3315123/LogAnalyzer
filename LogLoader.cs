@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace LogAnalyzer
@@ -86,7 +87,7 @@ namespace LogAnalyzer
             // Extract calendar date from file name (e.g. "2026-04-29_Total.txt")
             DateTime logDate = TryExtractDateFromFileName(fileName);
 
-            using (var reader = new StreamReader(filePath, System.Text.Encoding.UTF8, true))
+            using (var reader = new StreamReader(filePath, DetectEncoding(filePath), true))
             {
                 string line;
                 while ((line = reader.ReadLine()) != null)
@@ -109,6 +110,32 @@ namespace LogAnalyzer
             }
 
             return entries;
+        }
+
+        // ponytail: reads up to 4 KB to sniff encoding; ceiling = files with valid UTF-8 sequences
+        // that are actually CP949 (extremely rare in practice). Upgrade: chardet or ICU if needed.
+        private static Encoding DetectEncoding(string filePath)
+        {
+            byte[] buf = new byte[4096];
+            int read;
+            using (var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                read = fs.Read(buf, 0, buf.Length);
+
+            // BOM checks
+            if (read >= 3 && buf[0] == 0xEF && buf[1] == 0xBB && buf[2] == 0xBF) return Encoding.UTF8;
+            if (read >= 2 && buf[0] == 0xFF && buf[1] == 0xFE) return Encoding.Unicode;
+            if (read >= 2 && buf[0] == 0xFE && buf[1] == 0xFF) return Encoding.BigEndianUnicode;
+
+            // Try decoding as UTF-8 without BOM; fall back to system default (CP949 on Korean Windows)
+            try
+            {
+                new UTF8Encoding(false, true).GetString(buf, 0, read);
+                return new UTF8Encoding(false);
+            }
+            catch (DecoderFallbackException)
+            {
+                return Encoding.Default;
+            }
         }
 
         /// <summary>

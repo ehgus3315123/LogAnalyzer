@@ -29,6 +29,7 @@ namespace LogAnalyzer
     {
         // ── Backing fields ────────────────────────────────────────────────
         private string _searchKeyword = string.Empty;
+        private string _excludeKeyword = string.Empty;
         private bool _isLoading;
         private int _loadProgress;
         private string _statusText = "분석 모드를 선택하세요";
@@ -50,6 +51,7 @@ namespace LogAnalyzer
         public ListCollectionView CompareSecondView { get; }
         public ObservableCollection<string> LoadedFiles { get; } = new ObservableCollection<string>();
         public ObservableCollection<FilterChip> FilterChips { get; } = new ObservableCollection<FilterChip>();
+        public ObservableCollection<FilterChip> ExcludeChips { get; } = new ObservableCollection<FilterChip>();
 
         // ── Statistics (카운트만 유지 — 하단 바 표시용) ──────────────────
         private int _totalCount, _errorCount, _warnCount;
@@ -60,6 +62,11 @@ namespace LogAnalyzer
 
         // ── Filter object (stateless snapshot, rebuilt on change) ─────────
         private readonly LogFilter _filter = new LogFilter();
+
+        private static readonly string FilterFolder = @"C:\PDHLogFilter";
+        private static readonly string IncludeFile = Path.Combine(FilterFolder, "include.txt");
+        private static readonly string ExcludeFile = Path.Combine(FilterFolder, "exclude.txt");
+        private bool _suppressFilterSave;
 
         public MainWindowViewModel()
         {
@@ -80,8 +87,12 @@ namespace LogAnalyzer
             StartCompareModeCommand = new RelayCommand(StartCompareMode, CanStartCompareMode);
             ResetToStartupCommand = new RelayCommand(_ => ResetToStartup());
             AddFilterChipCommand = new RelayCommand(AddFilterChip);
+            AddExcludeChipCommand = new RelayCommand(AddExcludeChip);
 
-            FilterChips.CollectionChanged += (_, __) => ApplyFilter();
+            FilterChips.CollectionChanged += (_, __) => { SaveFilterChips(); ApplyFilter(); };
+            ExcludeChips.CollectionChanged += (_, __) => { SaveExcludeChips(); ApplyFilter(); };
+
+            LoadFilterChips();
         }
 
         // ── Public Properties ─────────────────────────────────────────────
@@ -93,8 +104,17 @@ namespace LogAnalyzer
                 if (_searchKeyword == value) return;
                 _searchKeyword = value;
                 OnPropertyChanged();
-                // 칩 없을 때 실시간 필터
-                if (FilterChips.Count == 0) ApplyFilter();
+            }
+        }
+
+        public string ExcludeKeyword
+        {
+            get => _excludeKeyword;
+            set
+            {
+                if (_excludeKeyword == value) return;
+                _excludeKeyword = value;
+                OnPropertyChanged();
             }
         }
 
@@ -228,6 +248,7 @@ namespace LogAnalyzer
         public ICommand StartCompareModeCommand { get; }
         public ICommand ResetToStartupCommand { get; }
         public ICommand AddFilterChipCommand { get; }
+        public ICommand AddExcludeChipCommand { get; }
 
         // ── FilterChip ────────────────────────────────────────────────────
         private void AddFilterChip()
@@ -250,6 +271,82 @@ namespace LogAnalyzer
         {
             if (chip == null) return;
             FilterChips.Remove(chip);
+        }
+
+        private void AddExcludeChip()
+        {
+            var kw = (_excludeKeyword ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(kw)) return;
+            if (ExcludeChips.Any(c => string.Equals(c.Keyword, kw, StringComparison.OrdinalIgnoreCase))) return;
+
+            FilterChip chip = null;
+            chip = new FilterChip
+            {
+                Keyword = kw,
+                RemoveCommand = new RelayCommand(() => RemoveExcludeChip(chip))
+            };
+            ExcludeChips.Add(chip);
+            ExcludeKeyword = string.Empty;
+        }
+
+        private void RemoveExcludeChip(FilterChip chip)
+        {
+            if (chip == null) return;
+            ExcludeChips.Remove(chip);
+        }
+
+        // ── Filter persistence ────────────────────────────────────────────
+        private void LoadFilterChips()
+        {
+            Directory.CreateDirectory(FilterFolder);
+
+            _suppressFilterSave = true;
+            try
+            {
+                foreach (var kw in ReadKeywords(IncludeFile))
+                    AddChipToCollection(FilterChips, kw, RemoveFilterChip);
+
+                var excludeKeywords = ReadKeywords(ExcludeFile).ToList();
+                if (!excludeKeywords.Any())
+                    excludeKeywords = new List<string> { "Q:A1" };
+                foreach (var kw in excludeKeywords)
+                    AddChipToCollection(ExcludeChips, kw, RemoveExcludeChip);
+            }
+            finally
+            {
+                _suppressFilterSave = false;
+            }
+        }
+
+        private static IEnumerable<string> ReadKeywords(string path)
+        {
+            if (!File.Exists(path)) return Enumerable.Empty<string>();
+            return File.ReadAllLines(path, Encoding.UTF8)
+                       .Select(l => l.Trim())
+                       .Where(l => !string.IsNullOrEmpty(l))
+                       .Distinct(StringComparer.OrdinalIgnoreCase);
+        }
+
+        private void AddChipToCollection(ObservableCollection<FilterChip> collection, string kw,
+                                         Action<FilterChip> removeAction)
+        {
+            if (collection.Any(c => string.Equals(c.Keyword, kw, StringComparison.OrdinalIgnoreCase))) return;
+            FilterChip chip = null;
+            chip = new FilterChip { Keyword = kw, RemoveCommand = new RelayCommand(() => removeAction(chip)) };
+            collection.Add(chip);
+        }
+
+        private void SaveFilterChips()  { if (!_suppressFilterSave) SaveKeywords(IncludeFile,  FilterChips); }
+        private void SaveExcludeChips() { if (!_suppressFilterSave) SaveKeywords(ExcludeFile, ExcludeChips); }
+
+        private static void SaveKeywords(string path, IEnumerable<FilterChip> chips)
+        {
+            try
+            {
+                Directory.CreateDirectory(FilterFolder);
+                File.WriteAllLines(path, chips.Select(c => c.Keyword), Encoding.UTF8);
+            }
+            catch { /* 저장 실패는 무시 — 필터 동작에는 영향 없음 */ }
         }
 
         // ── Command Implementations ───────────────────────────────────────
@@ -436,8 +533,13 @@ namespace LogAnalyzer
             CompareFirstFilePath = string.Empty;
             CompareSecondFilePath = string.Empty;
             IsStartupScreenVisible = true;
+            _suppressFilterSave = true;
             FilterChips.Clear();
+            ExcludeChips.Clear();
+            _suppressFilterSave = false;
+            LoadFilterChips();
             SearchKeyword = string.Empty;
+            ExcludeKeyword = string.Empty;
         }
 
         private void SelectSingleMode()
@@ -567,7 +669,7 @@ namespace LogAnalyzer
 
             try
             {
-                var lines = FilteredView.Cast<LogEntry>().Select(e => e.RawLine);
+                var lines = FilteredView.Cast<LogEntry>().SelectMany(ToTxtLines);
                 File.WriteAllLines(dlg.FileName, lines, Encoding.UTF8);
                 StatusText = $"TXT 저장 완료: {Path.GetFileName(dlg.FileName)}";
             }
@@ -626,7 +728,7 @@ namespace LogAnalyzer
 
             try
             {
-                var lines = ordered.Select(e => e.RawLine);
+                var lines = ordered.SelectMany(ToTxtLines);
                 File.WriteAllLines(dlg.FileName, lines, Encoding.UTF8);
                 StatusText = $"선택 TXT 저장 완료 ({ordered.Count:N0}건): {Path.GetFileName(dlg.FileName)}";
             }
@@ -646,7 +748,7 @@ namespace LogAnalyzer
         private static void WriteCsvFile(string path, IEnumerable<LogEntry> entries)
         {
             var sb = new StringBuilder();
-            sb.AppendLine("LineNumber,Timestamp,Level,Source,Message,FileName");
+            sb.AppendLine("LineNumber,Timestamp,Level,Source,Message,CallStack");
             foreach (var e in entries)
             {
                 sb.AppendLine($"{e.LineNumber}," +
@@ -654,9 +756,16 @@ namespace LogAnalyzer
                               $"{e.LevelDisplay}," +
                               $"\"{e.Source}\"," +
                               $"\"{EscapeCsv(e.Message)}\"," +
-                              $"\"{e.FileName}\"");
+                              $"\"{EscapeCsv(e.CallStack)}\"");
             }
             File.WriteAllText(path, sb.ToString(), Encoding.UTF8);
+        }
+
+        private static IEnumerable<string> ToTxtLines(LogEntry e)
+        {
+            yield return e.RawLine;
+            if (!string.IsNullOrWhiteSpace(e.CallStack))
+                yield return e.CallStack;
         }
 
         private void ToggleDarkMode()
@@ -670,6 +779,8 @@ namespace LogAnalyzer
         {
             _filter.IncludeChips = FilterChips.Select(c => c.Keyword).ToList();
             _filter.SearchKeyword = _searchKeyword;
+            _filter.ExcludeChips = ExcludeChips.Select(c => c.Keyword).ToList();
+            _filter.ExcludeKeyword = _excludeKeyword;
 
             FilteredView.Refresh();
             UpdateCompareViews();

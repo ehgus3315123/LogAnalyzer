@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using System.IO;
 using System.Windows;
 using System.Windows.Data;
 using System.Windows.Media;
@@ -115,6 +116,14 @@ namespace LogAnalyzer
     /// IsDragOver=true, IsDragOverValid=true/false 두 값을 받아
     /// parameter="valid" 이면 유효 드래그 색(Accent), 아니면 오류 색(Red)을 반환한다.
     /// </summary>
+    public class PathToFileNameConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+            => value is string s ? Path.GetFileName(s) : value;
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+            => throw new NotImplementedException();
+    }
+
     public class DragOverBrushConverter : IMultiValueConverter
     {
         public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)

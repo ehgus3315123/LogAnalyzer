@@ -25,6 +25,9 @@ namespace LogAnalyzer
             _vm = new MainWindowViewModel();
             DataContext = _vm;
 
+            var v = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
+            Title = $"Log Analyzer v{v.Major}.{v.Minor}";
+
             // Wire Ctrl+F to focus the exclude box
             PreviewKeyDown += OnPreviewKeyDown;
         }
@@ -165,6 +168,13 @@ namespace LogAnalyzer
             e.Handled = true;
         }
 
+        private void ExcludeChipSearchBox_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key != Key.Enter) return;
+            _vm.AddExcludeChipCommand.Execute(null);
+            e.Handled = true;
+        }
+
         private void OnPreviewKeyDown(object sender, KeyEventArgs e)
         {
             if (e.Key == Key.F && Keyboard.Modifiers == ModifierKeys.Control)
@@ -180,7 +190,9 @@ namespace LogAnalyzer
             var entries = GetSelectedEntries();
             if (entries.Count == 0) return;
             var text = string.Join(Environment.NewLine, entries.Select(x =>
-                $"{x.LineNumber}\t{x.TimestampDisplay}\t{x.LevelDisplay}\t{x.Source}\t{x.FileName}\t{x.Message}"));
+                string.IsNullOrWhiteSpace(x.CallStack)
+                    ? $"{x.TimestampDisplay}\t{x.LevelDisplay}\t{x.Source}\t{x.Message}"
+                    : $"{x.TimestampDisplay}\t{x.LevelDisplay}\t{x.Source}\t{x.Message}\t{x.CallStack}"));
             Clipboard.SetText(text);
         }
 
@@ -188,7 +200,7 @@ namespace LogAnalyzer
         {
             var entries = GetSelectedEntries();
             if (entries.Count == 0) return;
-            var text = string.Join(Environment.NewLine, entries.Select(x => x.Message));
+            var text = string.Join(Environment.NewLine, entries.Select(x => $"{x.TimestampDisplay}\t{x.Message}"));
             Clipboard.SetText(text);
         }
 
