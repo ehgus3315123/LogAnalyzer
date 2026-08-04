@@ -46,6 +46,10 @@ namespace LogAnalyzer
         private readonly RangeObservableCollection<LogEntry> _allEntries = new RangeObservableCollection<LogEntry>();
         private readonly ObservableCollection<LogEntry> _compareFirstEntries = new ObservableCollection<LogEntry>();
         private readonly ObservableCollection<LogEntry> _compareSecondEntries = new ObservableCollection<LogEntry>();
+
+        // ── Recent files ─────────────────────────────────────────────────
+        public ObservableCollection<RecentFileItem> RecentFiles { get; } = new ObservableCollection<RecentFileItem>();
+        public bool HasRecentFiles => RecentFiles.Count > 0;
         public ListCollectionView FilteredView { get; }
         public ListCollectionView CompareFirstView { get; }
         public ListCollectionView CompareSecondView { get; }
@@ -88,11 +92,15 @@ namespace LogAnalyzer
             ResetToStartupCommand = new RelayCommand(_ => ResetToStartup());
             AddFilterChipCommand = new RelayCommand(AddFilterChip);
             AddExcludeChipCommand = new RelayCommand(AddExcludeChip);
+            OpenRecentFileCommand = new RelayCommand(OpenRecentFile);
+            ClearRecentFilesCommand = new RelayCommand(ClearRecentFiles);
 
             FilterChips.CollectionChanged += (_, __) => { SaveFilterChips(); ApplyFilter(); };
             ExcludeChips.CollectionChanged += (_, __) => { SaveExcludeChips(); ApplyFilter(); };
+            RecentFiles.CollectionChanged += (_, __) => OnPropertyChanged(nameof(HasRecentFiles));
 
             LoadFilterChips();
+            RefreshRecentFiles();
         }
 
         // ── Public Properties ─────────────────────────────────────────────
@@ -249,6 +257,8 @@ namespace LogAnalyzer
         public ICommand ResetToStartupCommand { get; }
         public ICommand AddFilterChipCommand { get; }
         public ICommand AddExcludeChipCommand { get; }
+        public ICommand OpenRecentFileCommand { get; }
+        public ICommand ClearRecentFilesCommand { get; }
 
         // ── FilterChip ────────────────────────────────────────────────────
         private void AddFilterChip()
@@ -293,6 +303,47 @@ namespace LogAnalyzer
         {
             if (chip == null) return;
             ExcludeChips.Remove(chip);
+        }
+
+        // ── Recent files ─────────────────────────────────────────────────
+        private void RefreshRecentFiles()
+        {
+            RecentFiles.Clear();
+            foreach (var item in RecentFilesService.Load())
+                RecentFiles.Add(item);
+        }
+
+        private void RecordRecentFile(string path)
+        {
+            RecentFilesService.Add(path);
+            RefreshRecentFiles();
+        }
+
+        private void OpenRecentFile(object param)
+        {
+            var item = param as RecentFileItem;
+            if (item == null) return;
+
+            if (!File.Exists(item.FilePath))
+            {
+                MessageBox.Show($"파일을 찾을 수 없습니다:\n{item.FilePath}", "파일 없음",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                RecentFilesService.Remove(item.FilePath);
+                RefreshRecentFiles();
+                return;
+            }
+
+            SelectedMode = AnalysisMode.SingleFile;
+            CompleteStartup();
+            ClearFiles();
+            LoadedFiles.Add(item.FilePath);
+            LoadFile(item.FilePath);
+        }
+
+        private void ClearRecentFiles()
+        {
+            RecentFilesService.Clear();
+            RefreshRecentFiles();
         }
 
         // ── Filter persistence ────────────────────────────────────────────
@@ -491,6 +542,7 @@ namespace LogAnalyzer
                     LoadProgress = 100;
                     StatusText = $"로딩 마무리 중: {Path.GetFileName(e.FileName)} (목록 반영)";
                     _allEntries.AddRange(e.Entries);
+                    RecordRecentFile(e.FileName);
                 }
 
                 if (_pendingLoads == 0)
