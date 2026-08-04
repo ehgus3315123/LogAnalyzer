@@ -112,24 +112,39 @@ namespace LogAnalyzer
             return entries;
         }
 
-        // ponytail: reads up to 4 KB to sniff encoding; ceiling = files with valid UTF-8 sequences
-        // that are actually CP949 (extremely rare in practice). Upgrade: chardet or ICU if needed.
+        // ponytail: samples head + tail to catch CP949 Korean that appears late in large log files.
+        // Ceiling: pathological files with valid UTF-8 lead/tail but CP949 in the middle (upgrade: ICU).
         private static Encoding DetectEncoding(string filePath)
         {
-            byte[] buf = new byte[4096];
-            int read;
+            const int ChunkSize = 32768;
+            byte[] buf;
             using (var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-                read = fs.Read(buf, 0, buf.Length);
+            {
+                long len = fs.Length;
+                if (len <= ChunkSize * 2)
+                {
+                    buf = new byte[len];
+                    fs.Read(buf, 0, buf.Length);
+                }
+                else
+                {
+                    // head + tail
+                    buf = new byte[ChunkSize * 2];
+                    fs.Read(buf, 0, ChunkSize);
+                    fs.Seek(-ChunkSize, SeekOrigin.End);
+                    fs.Read(buf, ChunkSize, ChunkSize);
+                }
+            }
 
-            // BOM checks
-            if (read >= 3 && buf[0] == 0xEF && buf[1] == 0xBB && buf[2] == 0xBF) return Encoding.UTF8;
-            if (read >= 2 && buf[0] == 0xFF && buf[1] == 0xFE) return Encoding.Unicode;
-            if (read >= 2 && buf[0] == 0xFE && buf[1] == 0xFF) return Encoding.BigEndianUnicode;
+            // BOM checks (head only)
+            if (buf.Length >= 3 && buf[0] == 0xEF && buf[1] == 0xBB && buf[2] == 0xBF) return Encoding.UTF8;
+            if (buf.Length >= 2 && buf[0] == 0xFF && buf[1] == 0xFE) return Encoding.Unicode;
+            if (buf.Length >= 2 && buf[0] == 0xFE && buf[1] == 0xFF) return Encoding.BigEndianUnicode;
 
             // Try decoding as UTF-8 without BOM; fall back to system default (CP949 on Korean Windows)
             try
             {
-                new UTF8Encoding(false, true).GetString(buf, 0, read);
+                new UTF8Encoding(false, true).GetString(buf, 0, buf.Length);
                 return new UTF8Encoding(false);
             }
             catch (DecoderFallbackException)
