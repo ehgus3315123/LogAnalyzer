@@ -313,6 +313,65 @@
                             </Grid>
                         </Border>
 
+                        <!-- Recent files panel -->
+                        <Border Style="{StaticResource Card}" Margin="0,12,0,0"
+                                Visibility="{Binding HasRecentFiles, Converter={StaticResource BoolToVis}}">
+                            <StackPanel>
+                                <DockPanel Margin="0,0,0,8">
+                                    <Button DockPanel.Dock="Right" Content="목록 지우기"
+                                            Style="{StaticResource SecondaryButton}" Padding="10,3"
+                                            Command="{Binding ClearRecentFilesCommand}"/>
+                                    <TextBlock Text="최근 열었던 파일" Style="{StaticResource SectionHeader}"
+                                               Margin="0" VerticalAlignment="Center"/>
+                                </DockPanel>
+                                <ItemsControl ItemsSource="{Binding RecentFiles}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Command="{Binding DataContext.OpenRecentFileCommand,
+                                                        RelativeSource={RelativeSource AncestorType=Window}}"
+                                                    CommandParameter="{Binding}"
+                                                    Cursor="Hand" HorizontalContentAlignment="Stretch">
+                                                <Button.Template>
+                                                    <ControlTemplate TargetType="Button">
+                                                        <Border x:Name="Bd" Background="Transparent"
+                                                                CornerRadius="4" Padding="10,6" Margin="0,0,0,2">
+                                                            <Grid>
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="*"/>
+                                                                    <ColumnDefinition Width="Auto"/>
+                                                                </Grid.ColumnDefinitions>
+                                                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                                                    <TextBlock Text="{Binding FilePath, Converter={StaticResource PathToFileName}}"
+                                                                               FontWeight="SemiBold" FontSize="13"
+                                                                               Foreground="{DynamicResource ForegroundBrush}"
+                                                                               TextTrimming="CharacterEllipsis"/>
+                                                                    <TextBlock Text="{Binding FilePath}"
+                                                                               FontSize="11"
+                                                                               Foreground="{DynamicResource ForegroundMutedBrush}"
+                                                                               TextTrimming="CharacterEllipsis"/>
+                                                                </StackPanel>
+                                                                <TextBlock Grid.Column="1"
+                                                                           Text="{Binding LastOpened, StringFormat='{}{0:yyyy-MM-dd HH:mm}'}"
+                                                                           FontSize="11"
+                                                                           Foreground="{DynamicResource ForegroundMutedBrush}"
+                                                                           VerticalAlignment="Center" Margin="12,0,0,0"/>
+                                                            </Grid>
+                                                        </Border>
+                                                        <ControlTemplate.Triggers>
+                                                            <Trigger Property="IsMouseOver" Value="True">
+                                                                <Setter TargetName="Bd" Property="Background"
+                                                                        Value="{DynamicResource SurfaceAltBrush}"/>
+                                                            </Trigger>
+                                                        </ControlTemplate.Triggers>
+                                                    </ControlTemplate>
+                                                </Button.Template>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+
                         <!-- Compare setup panel -->
                         <Border Style="{StaticResource Card}" Margin="0,12,0,0"
                                 Visibility="{Binding IsCompareSetupVisible, Converter={StaticResource BoolToVis}}">

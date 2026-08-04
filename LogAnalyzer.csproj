@@ -71,6 +71,7 @@
     <Reference Include="WindowsBase" />
     <Reference Include="PresentationCore" />
     <Reference Include="PresentationFramework" />
+    <Reference Include="System.Runtime.Serialization" />
   </ItemGroup>
   <ItemGroup>
     <ApplicationDefinition Include="App.xaml">
@@ -118,6 +119,8 @@
       <DependentUpon>SearchWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="RecentFileItem.cs" />
+    <Compile Include="RecentFilesService.cs" />
     <Compile Include="RelayCommand.cs" />
     <Compile Include="ThemeManager.cs" />
     <Compile Include="TimelineChart.xaml.cs">
