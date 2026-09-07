@@ -25,6 +25,11 @@ namespace LogAnalyzer
 
             SearchCommand = new RelayCommand(RunSearch);
             GoToCommand = new RelayCommand(() => NavigateToSelected(), () => SelectedResult != null);
+            ApplyRecentSearchCommand = new RelayCommand(o => ApplyRecentSearch(o as RecentSearchItem));
+            RemoveRecentSearchCommand = new RelayCommand(o => RemoveRecentSearch(o as RecentSearchItem));
+            ClearRecentSearchesCommand = new RelayCommand(ClearRecentSearches);
+
+            LoadRecentSearches();
         }
 
         public string Query
@@ -79,8 +84,15 @@ namespace LogAnalyzer
             }
         }
 
+        public ObservableCollection<RecentSearchItem> RecentSearches { get; } = new ObservableCollection<RecentSearchItem>();
+
+        public bool HasRecentSearches => RecentSearches.Count > 0;
+
         public ICommand SearchCommand { get; }
         public ICommand GoToCommand { get; }
+        public ICommand ApplyRecentSearchCommand { get; }
+        public ICommand RemoveRecentSearchCommand { get; }
+        public ICommand ClearRecentSearchesCommand { get; }
 
         public void RunSearch()
         {
@@ -132,6 +144,39 @@ namespace LogAnalyzer
             }
 
             OnPropertyChanged(nameof(ResultSummary));
+
+            RecentSearchesService.Add(Query);
+            LoadRecentSearches();
+        }
+
+        private void LoadRecentSearches()
+        {
+            RecentSearches.Clear();
+            foreach (var item in RecentSearchesService.Load())
+                RecentSearches.Add(item);
+            OnPropertyChanged(nameof(HasRecentSearches));
+        }
+
+        public Action FocusQueryBox { get; set; }
+
+        private void ApplyRecentSearch(RecentSearchItem item)
+        {
+            if (item == null) return;
+            Query = item.Text;
+            FocusQueryBox?.Invoke();
+        }
+
+        private void RemoveRecentSearch(RecentSearchItem item)
+        {
+            if (item == null) return;
+            RecentSearchesService.Remove(item.Text);
+            LoadRecentSearches();
+        }
+
+        private void ClearRecentSearches()
+        {
+            RecentSearchesService.Clear();
+            LoadRecentSearches();
         }
 
         private void NavigateToSelected()

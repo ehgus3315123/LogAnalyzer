@@ -56,6 +56,7 @@ namespace LogAnalyzer
         public ObservableCollection<string> LoadedFiles { get; } = new ObservableCollection<string>();
         public ObservableCollection<FilterChip> FilterChips { get; } = new ObservableCollection<FilterChip>();
         public ObservableCollection<FilterChip> ExcludeChips { get; } = new ObservableCollection<FilterChip>();
+        public ObservableCollection<SourceExcludeItem> SourceFilters { get; } = new ObservableCollection<SourceExcludeItem>();
 
         // ── Statistics (카운트만 유지 — 하단 바 표시용) ──────────────────
         private int _totalCount, _errorCount, _warnCount;
@@ -70,7 +71,10 @@ namespace LogAnalyzer
         private static readonly string FilterFolder = @"C:\PDHLogFilter";
         private static readonly string IncludeFile = Path.Combine(FilterFolder, "include.txt");
         private static readonly string ExcludeFile = Path.Combine(FilterFolder, "exclude.txt");
+        private static readonly string SourcesExcludeFile = Path.Combine(FilterFolder, "sources_exclude.txt");
         private bool _suppressFilterSave;
+        private bool _suppressSourceFilterCallback;
+        private HashSet<string> _excludedSources = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         public MainWindowViewModel()
         {
@@ -92,6 +96,8 @@ namespace LogAnalyzer
             ResetToStartupCommand = new RelayCommand(_ => ResetToStartup());
             AddFilterChipCommand = new RelayCommand(AddFilterChip);
             AddExcludeChipCommand = new RelayCommand(AddExcludeChip);
+            SelectAllSourcesCommand = new RelayCommand(SelectAllSources, () => SourceFilters.Count > 0);
+            DeselectAllSourcesCommand = new RelayCommand(DeselectAllSources, () => SourceFilters.Count > 0);
             OpenRecentFileCommand = new RelayCommand(OpenRecentFile);
             ClearRecentFilesCommand = new RelayCommand(ClearRecentFiles);
 
@@ -99,6 +105,7 @@ namespace LogAnalyzer
             ExcludeChips.CollectionChanged += (_, __) => { SaveExcludeChips(); ApplyFilter(); };
             RecentFiles.CollectionChanged += (_, __) => OnPropertyChanged(nameof(HasRecentFiles));
 
+            LoadExcludedSources();
             LoadFilterChips();
             RefreshRecentFiles();
         }
@@ -242,6 +249,7 @@ namespace LogAnalyzer
         public int CompareFirstCount => CompareFirstView?.Count ?? 0;
         public int CompareSecondCount => CompareSecondView?.Count ?? 0;
         public bool IsEmpty => !_isLoading && FilteredCount == 0;
+        public bool HasSourceFilters => SourceFilters.Count > 0;
 
         // ── Commands ──────────────────────────────────────────────────────
         public ICommand AddFilesCommand { get; }
@@ -257,6 +265,8 @@ namespace LogAnalyzer
         public ICommand ResetToStartupCommand { get; }
         public ICommand AddFilterChipCommand { get; }
         public ICommand AddExcludeChipCommand { get; }
+        public ICommand SelectAllSourcesCommand { get; }
+        public ICommand DeselectAllSourcesCommand { get; }
         public ICommand OpenRecentFileCommand { get; }
         public ICommand ClearRecentFilesCommand { get; }
 
@@ -398,6 +408,98 @@ namespace LogAnalyzer
                 File.WriteAllLines(path, chips.Select(c => c.Keyword), Encoding.UTF8);
             }
             catch { /* 저장 실패는 무시 — 필터 동작에는 영향 없음 */ }
+        }
+
+        private void LoadExcludedSources()
+        {
+            _excludedSources = new HashSet<string>(ReadKeywords(SourcesExcludeFile), StringComparer.OrdinalIgnoreCase);
+        }
+
+        private void SaveExcludedSources()
+        {
+            if (_suppressSourceFilterCallback) return;
+            try
+            {
+                Directory.CreateDirectory(FilterFolder);
+                File.WriteAllLines(SourcesExcludeFile, _excludedSources.OrderBy(s => s, StringComparer.OrdinalIgnoreCase), Encoding.UTF8);
+            }
+            catch { /* 저장 실패는 무시 — 필터 동작에는 영향 없음 */ }
+        }
+
+        private void RefreshSourceFilters()
+        {
+            _suppressSourceFilterCallback = true;
+            try
+            {
+                SourceFilters.Clear();
+                foreach (var group in _allEntries
+                    .GroupBy(e => e.Source ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+                    .OrderByDescending(g => g.Count())
+                    .ThenBy(g => g.Key, StringComparer.OrdinalIgnoreCase))
+                {
+                    string source = group.Key;
+                    bool included = !_excludedSources.Contains(source);
+                    SourceFilters.Add(new SourceExcludeItem(source, group.Count(), included, OnSourceInclusionChanged));
+                }
+            }
+            finally
+            {
+                _suppressSourceFilterCallback = false;
+            }
+
+            OnPropertyChanged(nameof(HasSourceFilters));
+            CommandManager.InvalidateRequerySuggested();
+        }
+
+        private void OnSourceInclusionChanged()
+        {
+            if (_suppressSourceFilterCallback) return;
+            SyncExcludedSourcesFromUi();
+            SaveExcludedSources();
+            ApplyFilter();
+        }
+
+        private void SyncExcludedSourcesFromUi()
+        {
+            _excludedSources = new HashSet<string>(
+                SourceFilters.Where(s => !s.IsIncluded).Select(s => s.Source),
+                StringComparer.OrdinalIgnoreCase);
+        }
+
+        private void SelectAllSources()
+        {
+            _suppressSourceFilterCallback = true;
+            try
+            {
+                foreach (var item in SourceFilters)
+                    item.IsIncluded = true;
+            }
+            finally
+            {
+                _suppressSourceFilterCallback = false;
+            }
+
+            _excludedSources.Clear();
+            SaveExcludedSources();
+            ApplyFilter();
+        }
+
+        private void DeselectAllSources()
+        {
+            _suppressSourceFilterCallback = true;
+            try
+            {
+                foreach (var item in SourceFilters)
+                    item.IsIncluded = false;
+            }
+            finally
+            {
+                _suppressSourceFilterCallback = false;
+            }
+
+            SyncExcludedSourcesFromUi();
+            SaveExcludedSources();
+            ApplyFilter();
         }
 
         // ── Command Implementations ───────────────────────────────────────
@@ -550,6 +652,7 @@ namespace LogAnalyzer
                     IsLoading = false;
                     LoadProgress = 100;
                     RefreshStatistics();
+                    RefreshSourceFilters();
                     FilteredView.Refresh();
                     UpdateCompareViews();
                     OnPropertyChanged(nameof(FilteredCount));
@@ -570,6 +673,7 @@ namespace LogAnalyzer
             _allEntries.Clear();
             LoadedFiles.Clear();
             RefreshStatistics();
+            RefreshSourceFilters();
             FilteredView.Refresh();
             UpdateCompareViews();
             OnPropertyChanged(nameof(FilteredCount));
@@ -816,8 +920,6 @@ namespace LogAnalyzer
         private static IEnumerable<string> ToTxtLines(LogEntry e)
         {
             yield return e.RawLine;
-            if (!string.IsNullOrWhiteSpace(e.CallStack))
-                yield return e.CallStack;
         }
 
         private void ToggleDarkMode()
@@ -833,6 +935,7 @@ namespace LogAnalyzer
             _filter.SearchKeyword = _searchKeyword;
             _filter.ExcludeChips = ExcludeChips.Select(c => c.Keyword).ToList();
             _filter.ExcludeKeyword = _excludeKeyword;
+            _filter.ExcludedSources = _excludedSources;
 
             FilteredView.Refresh();
             UpdateCompareViews();

@@ -67,10 +67,12 @@
         </Style>
 
         <local:StringNotEmptyToVisibilityConverter x:Key="StrNotEmptyToVis"/>
+        <local:BoolToVisibilityConverter x:Key="BoolToVis"/>
     </Window.Resources>
 
     <Grid Margin="16">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
@@ -109,7 +111,57 @@
                        Visibility="{Binding RegexError, Converter={StaticResource StrNotEmptyToVis}}"/>
         </Grid>
 
-        <Border Grid.Row="2" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+        <!-- 최근 검색어 -->
+        <Border Grid.Row="2" Margin="0,0,0,10"
+                Visibility="{Binding HasRecentSearches, Converter={StaticResource BoolToVis}}">
+            <StackPanel>
+                <DockPanel Margin="0,0,0,4">
+                    <TextBlock Text="최근 검색" FontSize="11" FontWeight="SemiBold"
+                               Foreground="{DynamicResource ForegroundMutedBrush}"
+                               VerticalAlignment="Center"/>
+                    <Button DockPanel.Dock="Right" Content="지우기" FontSize="11"
+                            HorizontalAlignment="Right" VerticalAlignment="Center"
+                            Background="Transparent" BorderThickness="0" Cursor="Hand"
+                            Foreground="{DynamicResource ForegroundMutedBrush}"
+                            Command="{Binding ClearRecentSearchesCommand}"/>
+                </DockPanel>
+                <ItemsControl ItemsSource="{Binding RecentSearches}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel Orientation="Horizontal"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Background="{DynamicResource SurfaceAltBrush}"
+                                    BorderBrush="{DynamicResource BorderBrush}"
+                                    BorderThickness="1" CornerRadius="3"
+                                    Padding="6,2,2,2" Margin="0,0,6,4">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{Binding Text}" FontSize="11"
+                                               VerticalAlignment="Center" Cursor="Hand"
+                                               ToolTip="{Binding Text}">
+                                        <TextBlock.InputBindings>
+                                            <MouseBinding MouseAction="LeftClick"
+                                                          Command="{Binding DataContext.ApplyRecentSearchCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                          CommandParameter="{Binding}"/>
+                                        </TextBlock.InputBindings>
+                                    </TextBlock>
+                                    <Button Content="✕" FontSize="9" Padding="4,0"
+                                            Margin="4,0,0,0" VerticalAlignment="Center"
+                                            Background="Transparent" BorderThickness="0" Cursor="Hand"
+                                            Foreground="{DynamicResource ForegroundMutedBrush}"
+                                            Command="{Binding DataContext.RemoveRecentSearchCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                            CommandParameter="{Binding}"/>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
+
+        <Border Grid.Row="3" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
                 CornerRadius="4" Margin="0,0,0,12">
             <DockPanel>
                 <Border DockPanel.Dock="Top" Background="{DynamicResource SurfaceAltBrush}"
@@ -137,7 +189,7 @@
                                     </DataTemplate>
                                 </GridViewColumn.CellTemplate>
                             </GridViewColumn>
-                            <GridViewColumn Header="시각" Width="145">
+                            <GridViewColumn Header="시각" Width="70">
                                 <GridViewColumn.CellTemplate>
                                     <DataTemplate>
                                         <TextBlock Text="{Binding TimestampDisplay}" FontFamily="맑은 고딕" FontSize="11"
@@ -152,7 +204,7 @@
                                     </DataTemplate>
                                 </GridViewColumn.CellTemplate>
                             </GridViewColumn>
-                            <GridViewColumn Header="메시지" Width="320">
+                            <GridViewColumn Header="메시지" Width="450">
                                 <GridViewColumn.CellTemplate>
                                     <DataTemplate>
                                         <TextBlock Text="{Binding Message}" FontFamily="맑은 고딕" FontSize="11"
@@ -167,7 +219,7 @@
             </DockPanel>
         </Border>
 
-        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right">
+        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right">
             <Button Content="닫기" Style="{StaticResource SecondaryButton}" IsCancel="True"
                     Click="Close_OnClick"/>
         </StackPanel>

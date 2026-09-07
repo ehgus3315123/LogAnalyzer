@@ -20,12 +20,18 @@ namespace LogAnalyzer
         /// <summary>칩이 1개 이상이면 해당 키워드를 포함하는 항목은 숨김.</summary>
         public IReadOnlyList<string> ExcludeChips { get; set; } = Array.Empty<string>();
 
+        /// <summary>포함된 소스는 숨김. 비어있으면 소스 필터 없음.</summary>
+        public ISet<string> ExcludedSources { get; set; }
+
         public bool IsMatch(LogEntry entry)
         {
             if (entry == null) return false;
 
             var msg = entry.Message ?? string.Empty;
             var src = entry.Source ?? string.Empty;
+
+            if (ExcludedSources != null && ExcludedSources.Count > 0 && ExcludedSources.Contains(src))
+                return false;
 
             // 포함 조건
             if (IncludeChips != null && IncludeChips.Count > 0)

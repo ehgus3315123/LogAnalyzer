@@ -10,7 +10,9 @@ namespace LogAnalyzer
         public SearchWindow(Func<IEnumerable<LogEntry>> getEntries, Action<LogEntry> navigateToEntry)
         {
             InitializeComponent();
-            DataContext = new SearchViewModel(getEntries, navigateToEntry);
+            var vm = new SearchViewModel(getEntries, navigateToEntry);
+            vm.FocusQueryBox = () => { QueryBox.Focus(); QueryBox.SelectAll(); };
+            DataContext = vm;
         }
 
         private void SearchWindow_OnLoaded(object sender, RoutedEventArgs e)

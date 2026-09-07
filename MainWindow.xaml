@@ -675,6 +675,45 @@
                                         </DockPanel>
                                     </StackPanel>
                                 </Grid>
+
+                                <!-- 소스 필터: 체크된 소스만 표시 -->
+                                <StackPanel Margin="0,8,0,0"
+                                            Visibility="{Binding HasSourceFilters, Converter={StaticResource BoolToVis}}">
+                                    <DockPanel Margin="0,0,0,4">
+                                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal"
+                                                    HorizontalAlignment="Right">
+                                            <Button Content="전체" Command="{Binding SelectAllSourcesCommand}"
+                                                    Style="{StaticResource SecondaryButton}"
+                                                    Padding="8,2" FontSize="11" Margin="0,0,4,0"
+                                                    ToolTip="모든 소스 표시"/>
+                                            <Button Content="해제" Command="{Binding DeselectAllSourcesCommand}"
+                                                    Style="{StaticResource SecondaryButton}"
+                                                    Padding="8,2" FontSize="11"
+                                                    ToolTip="모든 소스 숨김"/>
+                                        </StackPanel>
+                                        <TextBlock Text="소스 필터" FontSize="11" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource ForegroundMutedBrush}"
+                                                   VerticalAlignment="Center"/>
+                                    </DockPanel>
+                                    <ScrollViewer MaxHeight="72" VerticalScrollBarVisibility="Auto"
+                                                  HorizontalScrollBarVisibility="Disabled">
+                                        <ItemsControl ItemsSource="{Binding SourceFilters}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <WrapPanel Orientation="Horizontal"/>
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <CheckBox IsChecked="{Binding IsIncluded}"
+                                                              Content="{Binding DisplayText}"
+                                                              Margin="0,0,12,4"
+                                                              ToolTip="체크된 소스만 목록에 표시"/>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </StackPanel>
                             </StackPanel>
                         </Border>
 
@@ -706,7 +745,7 @@
                                                 </DataTemplate>
                                             </GridViewColumn.CellTemplate>
                                         </GridViewColumn>
-                                        <GridViewColumn Header="시각" Width="150">
+                                        <GridViewColumn Header="시각" Width="70">
                                             <GridViewColumn.CellTemplate>
                                                 <DataTemplate>
                                                     <TextBlock Text="{Binding TimestampDisplay}"
@@ -729,7 +768,7 @@
                                                 </DataTemplate>
                                             </GridViewColumn.CellTemplate>
                                         </GridViewColumn>
-                                        <GridViewColumn Header="소스" Width="120">
+                                        <GridViewColumn Header="소스" Width="70">
                                             <GridViewColumn.CellTemplate>
                                                 <DataTemplate>
                                                     <TextBlock Text="{Binding Source}"
@@ -793,7 +832,7 @@
                                             </ListView.ContextMenu>
                                             <ListView.View>
                                                 <GridView>
-                                                    <GridViewColumn Header="시각" Width="90" DisplayMemberBinding="{Binding TimestampDisplay}"/>
+                                                    <GridViewColumn Header="시각" Width="60" DisplayMemberBinding="{Binding TimestampDisplay}"/>
                                                     <GridViewColumn Header="레벨" Width="66">
                                                         <GridViewColumn.CellTemplate>
                                                             <DataTemplate>
@@ -808,7 +847,7 @@
                                                             </DataTemplate>
                                                         </GridViewColumn.CellTemplate>
                                                     </GridViewColumn>
-                                                    <GridViewColumn Header="소스" Width="110" DisplayMemberBinding="{Binding Source}"/>
+                                                    <GridViewColumn Header="소스" Width="70" DisplayMemberBinding="{Binding Source}"/>
                                                     <GridViewColumn Header="메시지" Width="500" DisplayMemberBinding="{Binding Message}"/>
                                                 </GridView>
                                             </ListView.View>
@@ -848,7 +887,7 @@
                                             </ListView.ContextMenu>
                                             <ListView.View>
                                                 <GridView>
-                                                    <GridViewColumn Header="시각" Width="90" DisplayMemberBinding="{Binding TimestampDisplay}"/>
+                                                    <GridViewColumn Header="시각" Width="60" DisplayMemberBinding="{Binding TimestampDisplay}"/>
                                                     <GridViewColumn Header="레벨" Width="66">
                                                         <GridViewColumn.CellTemplate>
                                                             <DataTemplate>
@@ -863,7 +902,7 @@
                                                             </DataTemplate>
                                                         </GridViewColumn.CellTemplate>
                                                     </GridViewColumn>
-                                                    <GridViewColumn Header="소스" Width="110" DisplayMemberBinding="{Binding Source}"/>
+                                                    <GridViewColumn Header="소스" Width="70" DisplayMemberBinding="{Binding Source}"/>
                                                     <GridViewColumn Header="메시지" Width="500" DisplayMemberBinding="{Binding Message}"/>
                                                 </GridView>
                                             </ListView.View>

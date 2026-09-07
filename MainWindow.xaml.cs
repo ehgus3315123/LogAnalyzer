@@ -190,9 +190,7 @@ namespace LogAnalyzer
             var entries = GetSelectedEntries();
             if (entries.Count == 0) return;
             var text = string.Join(Environment.NewLine, entries.Select(x =>
-                string.IsNullOrWhiteSpace(x.CallStack)
-                    ? $"{x.TimestampDisplay}\t{x.LevelDisplay}\t{x.Source}\t{x.Message}"
-                    : $"{x.TimestampDisplay}\t{x.LevelDisplay}\t{x.Source}\t{x.Message}\t{x.CallStack}"));
+                $"{x.TimestampDisplay}\t{x.LevelDisplay}\t{x.Source}\t{x.Message}"));
             Clipboard.SetText(text);
         }
 
