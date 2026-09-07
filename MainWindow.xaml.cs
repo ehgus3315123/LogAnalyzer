@@ -26,7 +26,7 @@ namespace LogAnalyzer
             DataContext = _vm;
 
             var v = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
-            Title = $"Log Analyzer v{v.Major}.{v.Minor}";
+            Title = $"Log Analyzer {v.Major}.{v.Minor}";
 
             // Wire Ctrl+F to focus the exclude box
             PreviewKeyDown += OnPreviewKeyDown;
