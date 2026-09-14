@@ -2,7 +2,7 @@ using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
-namespace LogAnalyzer
+namespace LogViewer
 {
     public class SourceExcludeItem : INotifyPropertyChanged
     {

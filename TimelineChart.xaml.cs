@@ -7,7 +7,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Shapes;
 
-namespace LogAnalyzer
+namespace LogViewer
 {
     public partial class TimelineChart : UserControl
     {

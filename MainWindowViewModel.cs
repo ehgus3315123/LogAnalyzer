@@ -11,14 +11,8 @@ using System.Windows.Data;
 using System.Windows.Input;
 using Microsoft.Win32;
 
-namespace LogAnalyzer
+namespace LogViewer
 {
-    public enum AnalysisMode
-    {
-        SingleFile,
-        MultiFileCompare
-    }
-
     public class FilterChip
     {
         public string Keyword { get; set; }
@@ -32,27 +26,20 @@ namespace LogAnalyzer
         private string _excludeKeyword = string.Empty;
         private bool _isLoading;
         private int _loadProgress;
-        private string _statusText = "분석 모드를 선택하세요";
+        private string _statusText = "로그 파일을 불러오세요";
         private bool _isDarkMode;
         private LogEntry _selectedEntry;
-        private AnalysisMode? _selectedMode;
         private bool _isStartupScreenVisible = true;
-        private string _compareFirstFilePath = string.Empty;
-        private string _compareSecondFilePath = string.Empty;
         private bool _isDragOver;
         private bool _isDragOverValid;
 
         // ── Collections ──────────────────────────────────────────────────
         private readonly RangeObservableCollection<LogEntry> _allEntries = new RangeObservableCollection<LogEntry>();
-        private readonly ObservableCollection<LogEntry> _compareFirstEntries = new ObservableCollection<LogEntry>();
-        private readonly ObservableCollection<LogEntry> _compareSecondEntries = new ObservableCollection<LogEntry>();
 
         // ── Recent files ─────────────────────────────────────────────────
         public ObservableCollection<RecentFileItem> RecentFiles { get; } = new ObservableCollection<RecentFileItem>();
         public bool HasRecentFiles => RecentFiles.Count > 0;
         public ListCollectionView FilteredView { get; }
-        public ListCollectionView CompareFirstView { get; }
-        public ListCollectionView CompareSecondView { get; }
         public ObservableCollection<string> LoadedFiles { get; } = new ObservableCollection<string>();
         public ObservableCollection<FilterChip> FilterChips { get; } = new ObservableCollection<FilterChip>();
         public ObservableCollection<FilterChip> ExcludeChips { get; } = new ObservableCollection<FilterChip>();
@@ -76,23 +63,19 @@ namespace LogAnalyzer
         private bool _suppressSourceFilterCallback;
         private HashSet<string> _excludedSources = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
+        private static readonly HashSet<string> ALLOWED_EXTENSIONS =
+            new HashSet<string>(new[] { ".log", ".txt" }, StringComparer.OrdinalIgnoreCase);
+
         public MainWindowViewModel()
         {
             FilteredView = new ListCollectionView(_allEntries);
             FilteredView.Filter = FilterPredicate;
-            CompareFirstView = new ListCollectionView(_compareFirstEntries);
-            CompareSecondView = new ListCollectionView(_compareSecondEntries);
 
-            AddFilesCommand = new RelayCommand(AddFiles);
+            OpenFileCommand = new RelayCommand(OpenFile);
             ClearFilesCommand = new RelayCommand(ClearFiles, () => _allEntries.Count > 0 && !_isLoading);
             ExportCsvCommand = new RelayCommand(ExportCsv, () => FilteredCount > 0);
             ExportTxtCommand = new RelayCommand(ExportTxt, () => FilteredCount > 0);
             ToggleDarkModeCommand = new RelayCommand(ToggleDarkMode);
-            SelectSingleModeCommand = new RelayCommand(SelectSingleMode);
-            SelectCompareModeCommand = new RelayCommand(SelectCompareMode);
-            BrowseCompareFirstFileCommand = new RelayCommand(BrowseCompareFirstFile);
-            BrowseCompareSecondFileCommand = new RelayCommand(BrowseCompareSecondFile);
-            StartCompareModeCommand = new RelayCommand(StartCompareMode, CanStartCompareMode);
             ResetToStartupCommand = new RelayCommand(_ => ResetToStartup());
             AddFilterChipCommand = new RelayCommand(AddFilterChip);
             AddExcludeChipCommand = new RelayCommand(AddExcludeChip);
@@ -100,6 +83,7 @@ namespace LogAnalyzer
             DeselectAllSourcesCommand = new RelayCommand(DeselectAllSources, () => SourceFilters.Count > 0);
             OpenRecentFileCommand = new RelayCommand(OpenRecentFile);
             ClearRecentFilesCommand = new RelayCommand(ClearRecentFiles);
+            RefreshFilesCommand = new RelayCommand(RefreshLoadedFiles, () => LoadedFiles.Count > 0 && !_isLoading);
 
             FilterChips.CollectionChanged += (_, __) => { SaveFilterChips(); ApplyFilter(); };
             ExcludeChips.CollectionChanged += (_, __) => { SaveExcludeChips(); ApplyFilter(); };
@@ -163,24 +147,6 @@ namespace LogAnalyzer
             set { _selectedEntry = value; OnPropertyChanged(); }
         }
 
-        public AnalysisMode? SelectedMode
-        {
-            get => _selectedMode;
-            private set
-            {
-                _selectedMode = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(IsModeSelected));
-                OnPropertyChanged(nameof(IsSingleMode));
-                OnPropertyChanged(nameof(IsCompareMode));
-                OnPropertyChanged(nameof(IsCompareSetupVisible));
-            }
-        }
-
-        public bool IsModeSelected => SelectedMode.HasValue;
-        public bool IsSingleMode => SelectedMode == AnalysisMode.SingleFile;
-        public bool IsCompareMode => SelectedMode == AnalysisMode.MultiFileCompare;
-
         public bool IsStartupScreenVisible
         {
             get => _isStartupScreenVisible;
@@ -190,8 +156,6 @@ namespace LogAnalyzer
                 OnPropertyChanged();
             }
         }
-
-        public bool IsCompareSetupVisible => IsStartupScreenVisible && IsCompareMode;
 
         public bool IsDragOver
         {
@@ -205,63 +169,20 @@ namespace LogAnalyzer
             set { if (_isDragOverValid == value) return; _isDragOverValid = value; OnPropertyChanged(); }
         }
 
-        public string CompareFirstFilePath
-        {
-            get => _compareFirstFilePath;
-            set
-            {
-                if (_compareFirstFilePath == value) return;
-                _compareFirstFilePath = value ?? string.Empty;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(CompareFirstFileName));
-                UpdateCompareViews();
-                CommandManager.InvalidateRequerySuggested();
-            }
-        }
-
-        public string CompareSecondFilePath
-        {
-            get => _compareSecondFilePath;
-            set
-            {
-                if (_compareSecondFilePath == value) return;
-                _compareSecondFilePath = value ?? string.Empty;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(CompareSecondFileName));
-                UpdateCompareViews();
-                CommandManager.InvalidateRequerySuggested();
-            }
-        }
-
-        public string CompareFirstFileName => string.IsNullOrWhiteSpace(CompareFirstFilePath)
-            ? "(첫 번째 파일)"
-            : Path.GetFileName(CompareFirstFilePath);
-
-        public string CompareSecondFileName => string.IsNullOrWhiteSpace(CompareSecondFilePath)
-            ? "(두 번째 파일)"
-            : Path.GetFileName(CompareSecondFilePath);
-
         public int TotalCount { get => _totalCount; private set { _totalCount = value; OnPropertyChanged(); UpdateStatus(); } }
         public int ErrorCount { get => _errorCount; private set { _errorCount = value; OnPropertyChanged(); } }
         public int WarnCount { get => _warnCount; private set { _warnCount = value; OnPropertyChanged(); } }
 
         public int FilteredCount => FilteredView?.Count ?? 0;
-        public int CompareFirstCount => CompareFirstView?.Count ?? 0;
-        public int CompareSecondCount => CompareSecondView?.Count ?? 0;
         public bool IsEmpty => !_isLoading && FilteredCount == 0;
         public bool HasSourceFilters => SourceFilters.Count > 0;
 
         // ── Commands ──────────────────────────────────────────────────────
-        public ICommand AddFilesCommand { get; }
+        public ICommand OpenFileCommand { get; }
         public ICommand ClearFilesCommand { get; }
         public ICommand ExportCsvCommand { get; }
         public ICommand ExportTxtCommand { get; }
         public ICommand ToggleDarkModeCommand { get; }
-        public ICommand SelectSingleModeCommand { get; }
-        public ICommand SelectCompareModeCommand { get; }
-        public ICommand BrowseCompareFirstFileCommand { get; }
-        public ICommand BrowseCompareSecondFileCommand { get; }
-        public ICommand StartCompareModeCommand { get; }
         public ICommand ResetToStartupCommand { get; }
         public ICommand AddFilterChipCommand { get; }
         public ICommand AddExcludeChipCommand { get; }
@@ -269,6 +190,7 @@ namespace LogAnalyzer
         public ICommand DeselectAllSourcesCommand { get; }
         public ICommand OpenRecentFileCommand { get; }
         public ICommand ClearRecentFilesCommand { get; }
+        public ICommand RefreshFilesCommand { get; }
 
         // ── FilterChip ────────────────────────────────────────────────────
         private void AddFilterChip()
@@ -343,11 +265,7 @@ namespace LogAnalyzer
                 return;
             }
 
-            SelectedMode = AnalysisMode.SingleFile;
-            CompleteStartup();
-            ClearFiles();
-            LoadedFiles.Add(item.FilePath);
-            LoadFile(item.FilePath);
+            OpenLoadedFile(item.FilePath);
         }
 
         private void ClearRecentFiles()
@@ -503,36 +421,20 @@ namespace LogAnalyzer
         }
 
         // ── Command Implementations ───────────────────────────────────────
-        private void AddFiles(object _)
+        private void OpenFile(object _)
         {
-            if (!IsModeSelected)
-            {
-                MessageBox.Show("먼저 시작 화면에서 분석 모드를 선택하세요.", "모드 선택", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-
             var dlg = new OpenFileDialog
             {
                 Title = "로그 파일 선택",
                 Filter = "로그 파일 (*.log;*.txt)|*.log;*.txt|모든 파일 (*.*)|*.*",
-                Multiselect = IsCompareMode
+                Multiselect = false
             };
             if (dlg.ShowDialog() != true) return;
-            if (IsSingleMode)
-            {
-                AddFilePaths(new[] { dlg.FileName });
-                return;
-            }
-
-            AddFilePaths(dlg.FileNames);
+            OpenLoadedFile(dlg.FileName);
         }
-
-        private static readonly HashSet<string> ALLOWED_EXTENSIONS =
-            new HashSet<string>(new[] { ".log", ".txt" }, StringComparer.OrdinalIgnoreCase);
 
         /// <summary>
         /// 시작 화면에서 단일 파일 드래그 앤 드롭 처리.
-        /// 유효한 파일이면 단일 파일 분석을 바로 시작한다.
         /// </summary>
         public void DropSingleFileOnStartup(string path)
         {
@@ -549,11 +451,7 @@ namespace LogAnalyzer
                 return;
             }
 
-            SelectedMode = AnalysisMode.SingleFile;
-            CompleteStartup();
-            ClearFiles();
-            LoadedFiles.Add(path);
-            LoadFile(path);
+            OpenLoadedFile(path);
         }
 
         /// <summary>
@@ -565,28 +463,20 @@ namespace LogAnalyzer
             return ALLOWED_EXTENSIONS.Contains(Path.GetExtension(path));
         }
 
-        /// <summary>여러 경로를 한 번에 추가합니다(파일 대화상자, 드래그 앤 드롭 등).</summary>
+        /// <summary>파일 경로를 받아 로드합니다(파일 대화상자, 드래그 앤 드롭 등).</summary>
         public void AddFilePaths(IEnumerable<string> paths)
         {
             if (paths == null) return;
-            if (!IsModeSelected)
-            {
-                MessageBox.Show("먼저 시작 화면에서 분석 모드를 선택하세요.", "모드 선택", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
 
-            var validPaths = new List<string>();
+            string selected = null;
             foreach (var raw in paths)
             {
                 if (string.IsNullOrWhiteSpace(raw)) continue;
                 try
                 {
                     if (!File.Exists(raw)) continue;
-                    var path = Path.GetFullPath(raw);
-                    if (!validPaths.Contains(path, StringComparer.OrdinalIgnoreCase))
-                    {
-                        validPaths.Add(path);
-                    }
+                    selected = Path.GetFullPath(raw);
+                    break;
                 }
                 catch
                 {
@@ -594,26 +484,16 @@ namespace LogAnalyzer
                 }
             }
 
-            if (validPaths.Count == 0) return;
+            if (selected == null) return;
+            OpenLoadedFile(selected);
+        }
 
-            if (IsSingleMode)
-            {
-                var singlePath = validPaths[0];
-                ClearFiles();
-                LoadedFiles.Add(singlePath);
-                LoadFile(singlePath);
-                return;
-            }
-
-            foreach (var path in validPaths)
-            {
-                if (LoadedFiles.Contains(path)) continue;
-                LoadedFiles.Add(path);
-                LoadFile(path);
-            }
-
-            UpdateCompareTargetsFromLoadedFiles();
-            UpdateCompareViews();
+        private void OpenLoadedFile(string path)
+        {
+            IsStartupScreenVisible = false;
+            ClearFiles();
+            LoadedFiles.Add(path);
+            LoadFile(path);
         }
 
         private void LoadFile(string path)
@@ -654,7 +534,6 @@ namespace LogAnalyzer
                     RefreshStatistics();
                     RefreshSourceFilters();
                     FilteredView.Refresh();
-                    UpdateCompareViews();
                     OnPropertyChanged(nameof(FilteredCount));
                     OnPropertyChanged(nameof(IsEmpty));
                     UpdateStatus();
@@ -675,19 +554,34 @@ namespace LogAnalyzer
             RefreshStatistics();
             RefreshSourceFilters();
             FilteredView.Refresh();
-            UpdateCompareViews();
             OnPropertyChanged(nameof(FilteredCount));
-            StatusText = IsModeSelected ? "로그 파일을 불러오세요" : "분석 모드를 선택하세요";
+            StatusText = "로그 파일을 불러오세요";
             LoadProgress = 0;
             IsLoading = false;
+        }
+
+        /// <summary>현재 로드된 파일을 디스크에서 다시 읽습니다. 필터는 유지합니다.</summary>
+        private void RefreshLoadedFiles()
+        {
+            var paths = LoadedFiles.ToList();
+            if (paths.Count == 0) return;
+
+            if (!paths.Any(File.Exists))
+            {
+                MessageBox.Show(
+                    "다시 불러올 파일이 없습니다.\n파일이 이동되었거나 삭제되었을 수 있습니다.",
+                    "새로고침",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+
+            OpenLoadedFile(paths[0]);
         }
 
         private void ResetToStartup()
         {
             ClearFiles();
-            SelectedMode = null;
-            CompareFirstFilePath = string.Empty;
-            CompareSecondFilePath = string.Empty;
             IsStartupScreenVisible = true;
             _suppressFilterSave = true;
             FilterChips.Clear();
@@ -696,100 +590,6 @@ namespace LogAnalyzer
             LoadFilterChips();
             SearchKeyword = string.Empty;
             ExcludeKeyword = string.Empty;
-        }
-
-        private void SelectSingleMode()
-        {
-            SelectedMode = AnalysisMode.SingleFile;
-            UpdateCompareSetupVisibility();
-
-            var dlg = new OpenFileDialog
-            {
-                Title = "단일 분석 파일 선택",
-                Filter = "로그 파일 (*.log;*.txt)|*.log;*.txt|모든 파일 (*.*)|*.*",
-                Multiselect = false
-            };
-
-            if (dlg.ShowDialog() != true)
-            {
-                SelectedMode = null;
-                UpdateCompareSetupVisibility();
-                UpdateStatus();
-                return;
-            }
-
-            CompleteStartup();
-            AddFilePaths(new[] { dlg.FileName });
-        }
-
-        private void SelectCompareMode()
-        {
-            SelectedMode = AnalysisMode.MultiFileCompare;
-            UpdateCompareSetupVisibility();
-            UpdateCompareViews();
-            UpdateStatus();
-        }
-
-        private void BrowseCompareFirstFile()
-        {
-            var selectedPath = SelectCompareFile("첫 번째 파일 선택");
-            if (!string.IsNullOrWhiteSpace(selectedPath))
-            {
-                CompareFirstFilePath = selectedPath;
-            }
-        }
-
-        private void BrowseCompareSecondFile()
-        {
-            var selectedPath = SelectCompareFile("두 번째 파일 선택");
-            if (!string.IsNullOrWhiteSpace(selectedPath))
-            {
-                CompareSecondFilePath = selectedPath;
-            }
-        }
-
-        private bool CanStartCompareMode(object _)
-        {
-            return IsCompareMode
-                && File.Exists(CompareFirstFilePath)
-                && File.Exists(CompareSecondFilePath)
-                && !string.Equals(CompareFirstFilePath, CompareSecondFilePath, StringComparison.OrdinalIgnoreCase);
-        }
-
-        private void StartCompareMode(object _)
-        {
-            if (!CanStartCompareMode(null))
-            {
-                MessageBox.Show("서로 다른 두 개의 유효한 파일을 선택하세요.", "비교 모드", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-
-            CompleteStartup();
-            ClearFiles();
-            AddFilePaths(new[] { CompareFirstFilePath, CompareSecondFilePath });
-        }
-
-        private string SelectCompareFile(string title)
-        {
-            var dlg = new OpenFileDialog
-            {
-                Title = title,
-                Filter = "로그 파일 (*.log;*.txt)|*.log;*.txt|모든 파일 (*.*)|*.*",
-                Multiselect = false
-            };
-
-            return dlg.ShowDialog() == true ? dlg.FileName : string.Empty;
-        }
-
-        private void CompleteStartup()
-        {
-            IsStartupScreenVisible = false;
-            UpdateCompareSetupVisibility();
-        }
-
-        private void UpdateCompareSetupVisibility()
-        {
-            OnPropertyChanged(nameof(IsCompareSetupVisible));
         }
 
         private void ExportCsv()
@@ -938,7 +738,6 @@ namespace LogAnalyzer
             _filter.ExcludedSources = _excludedSources;
 
             FilteredView.Refresh();
-            UpdateCompareViews();
             OnPropertyChanged(nameof(FilteredCount));
             OnPropertyChanged(nameof(IsEmpty));
             UpdateStatus();
@@ -967,7 +766,7 @@ namespace LogAnalyzer
             int total = _allEntries.Count;
             int filtered = FilteredCount;
             StatusText = total == 0
-                ? (IsModeSelected ? "로그 파일을 불러오세요" : "분석 모드를 선택하세요")
+                ? "로그 파일을 불러오세요"
                 : $"표시: {filtered:N0} / 전체: {total:N0}  |  ERROR {ErrorCount:N0}  WARN {WarnCount:N0}";
         }
 
@@ -977,56 +776,6 @@ namespace LogAnalyzer
         /// <summary>Whether the entry would appear in the main list under the current filter.</summary>
         public bool IsEntryVisibleInMainList(LogEntry entry) =>
             entry != null && _filter.IsMatch(entry);
-
-        private void UpdateCompareTargetsFromLoadedFiles()
-        {
-            if (LoadedFiles.Count > 0 && string.IsNullOrWhiteSpace(CompareFirstFilePath))
-            {
-                CompareFirstFilePath = LoadedFiles[0];
-            }
-
-            if (LoadedFiles.Count > 1 && string.IsNullOrWhiteSpace(CompareSecondFilePath))
-            {
-                CompareSecondFilePath = LoadedFiles[1];
-            }
-        }
-
-        private void UpdateCompareViews()
-        {
-            if (!IsCompareMode)
-            {
-                ReplaceEntries(_compareFirstEntries, Array.Empty<LogEntry>());
-                ReplaceEntries(_compareSecondEntries, Array.Empty<LogEntry>());
-                OnPropertyChanged(nameof(CompareFirstCount));
-                OnPropertyChanged(nameof(CompareSecondCount));
-                return;
-            }
-
-            var firstName = string.IsNullOrWhiteSpace(CompareFirstFilePath) ? string.Empty : Path.GetFileName(CompareFirstFilePath);
-            var secondName = string.IsNullOrWhiteSpace(CompareSecondFilePath) ? string.Empty : Path.GetFileName(CompareSecondFilePath);
-            var visibleEntries = FilteredView.Cast<LogEntry>().ToList();
-
-            ReplaceEntries(_compareFirstEntries, visibleEntries.Where(entry =>
-                !string.IsNullOrWhiteSpace(firstName)
-                && string.Equals(entry.FileName, firstName, StringComparison.OrdinalIgnoreCase)));
-            ReplaceEntries(_compareSecondEntries, visibleEntries.Where(entry =>
-                !string.IsNullOrWhiteSpace(secondName)
-                && string.Equals(entry.FileName, secondName, StringComparison.OrdinalIgnoreCase)));
-
-            CompareFirstView.Refresh();
-            CompareSecondView.Refresh();
-            OnPropertyChanged(nameof(CompareFirstCount));
-            OnPropertyChanged(nameof(CompareSecondCount));
-        }
-
-        private static void ReplaceEntries(ObservableCollection<LogEntry> target, IEnumerable<LogEntry> entries)
-        {
-            target.Clear();
-            foreach (var entry in entries)
-            {
-                target.Add(entry);
-            }
-        }
 
         // ── Helpers ───────────────────────────────────────────────────────
         private static string EscapeCsv(string s) => (s ?? string.Empty).Replace("\"", "\"\"");

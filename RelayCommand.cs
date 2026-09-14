@@ -1,7 +1,7 @@
 using System;
 using System.Windows.Input;
 
-namespace LogAnalyzer
+namespace LogViewer
 {
     public class RelayCommand : ICommand
     {

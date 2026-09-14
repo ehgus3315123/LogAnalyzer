@@ -4,7 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.Serialization.Json;
 
-namespace LogAnalyzer
+namespace LogViewer
 {
     public static class RecentSearchesService
     {
@@ -12,7 +12,7 @@ namespace LogAnalyzer
 
         private static readonly string FilePath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "LogAnalyzer",
+            "LogViewer",
             "recent_searches.json");
 
         private static readonly DataContractJsonSerializer Serializer =

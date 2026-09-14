@@ -1,10 +1,10 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 
-namespace LogAnalyzer
+namespace LogViewer
 {
     public partial class MainWindow : Window
     {
@@ -26,7 +26,7 @@ namespace LogAnalyzer
             DataContext = _vm;
 
             var v = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
-            Title = $"Log Analyzer {v.Major}.{v.Minor}";
+            Title = $"Log Viewer {v.Major}.{v.Minor}";
 
             // Wire Ctrl+F to focus the exclude box
             PreviewKeyDown += OnPreviewKeyDown;
@@ -86,7 +86,7 @@ namespace LogAnalyzer
                 if (paths.Length > 1)
                 {
                     MessageBox.Show(
-                        "파일을 1개만 드래그하세요.\n시작 화면에서는 단일 파일 분석만 지원합니다.",
+                        "파일을 1개만 드래그하세요.",
                         "파일 드롭 오류",
                         MessageBoxButton.OK,
                         MessageBoxImage.Warning);
@@ -204,29 +204,7 @@ namespace LogAnalyzer
 
         private System.Collections.Generic.List<LogEntry> GetSelectedEntries()
         {
-            var selected = new System.Collections.Generic.HashSet<LogEntry>();
-            foreach (var item in LogListView.SelectedItems.Cast<LogEntry>())
-            {
-                selected.Add(item);
-            }
-
-            if (CompareFirstListView != null)
-            {
-                foreach (var item in CompareFirstListView.SelectedItems.Cast<LogEntry>())
-                {
-                    selected.Add(item);
-                }
-            }
-
-            if (CompareSecondListView != null)
-            {
-                foreach (var item in CompareSecondListView.SelectedItems.Cast<LogEntry>())
-                {
-                    selected.Add(item);
-                }
-            }
-
-            return selected.ToList();
+            return LogListView.SelectedItems.Cast<LogEntry>().ToList();
         }
     }
 }

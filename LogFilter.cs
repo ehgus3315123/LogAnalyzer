@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace LogAnalyzer
+namespace LogViewer
 {
     public class LogFilter
     {

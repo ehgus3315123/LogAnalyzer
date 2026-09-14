@@ -1,6 +1,6 @@
-﻿using System.Windows;
+using System.Windows;
 
-namespace LogAnalyzer
+namespace LogViewer
 {
     public partial class App : Application
     {

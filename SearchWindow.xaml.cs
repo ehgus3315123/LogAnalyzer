@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Input;
 
-namespace LogAnalyzer
+namespace LogViewer
 {
     public partial class SearchWindow : Window
     {

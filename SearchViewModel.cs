@@ -7,7 +7,7 @@ using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using System.Windows.Input;
 
-namespace LogAnalyzer
+namespace LogViewer
 {
     public class SearchViewModel : INotifyPropertyChanged
     {

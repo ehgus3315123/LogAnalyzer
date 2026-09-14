@@ -1,6 +1,6 @@
 using System;
 
-namespace LogAnalyzer
+namespace LogViewer
 {
     public class LogEntry
     {

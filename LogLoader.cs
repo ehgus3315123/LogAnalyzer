@@ -5,7 +5,7 @@ using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace LogAnalyzer
+namespace LogViewer
 {
     public class LogLoadProgressEventArgs : EventArgs
     {

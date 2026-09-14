@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 
-namespace LogAnalyzer
+namespace LogViewer
 {
     public class KeywordCount
     {

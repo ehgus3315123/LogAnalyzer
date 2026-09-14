@@ -1,7 +1,7 @@
 using System;
 using System.Runtime.Serialization;
 
-namespace LogAnalyzer
+namespace LogViewer
 {
     [DataContract]
     public class RecentSearchItem

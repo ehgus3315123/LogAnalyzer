@@ -1,6 +1,6 @@
 using System.Windows;
 
-namespace LogAnalyzer
+namespace LogViewer
 {
     public static class ThemeManager
     {
