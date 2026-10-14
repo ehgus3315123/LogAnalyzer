@@ -16,6 +16,7 @@
     <Color x:Key="DebugColor">#388E3C</Color>
     <Color x:Key="RowAltColor">#F9F9F9</Color>
     <Color x:Key="SelectionColor">#BBDEFB</Color>
+    <Color x:Key="HoverColor">#E3F2FD</Color>
 
     <!-- Brushes -->
     <SolidColorBrush x:Key="BackgroundBrush" Color="{StaticResource BackgroundColor}"/>
@@ -32,5 +33,6 @@
     <SolidColorBrush x:Key="DebugBrush" Color="{StaticResource DebugColor}"/>
     <SolidColorBrush x:Key="RowAltBrush" Color="{StaticResource RowAltColor}"/>
     <SolidColorBrush x:Key="SelectionBrush" Color="{StaticResource SelectionColor}"/>
+    <SolidColorBrush x:Key="HoverBrush" Color="{StaticResource HoverColor}"/>
 
 </ResourceDictionary>

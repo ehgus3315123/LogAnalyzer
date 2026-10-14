@@ -63,6 +63,42 @@
             </Style.Triggers>
         </Style>
 
+        <!-- Source filter chip: on = accent fill, off = muted outline -->
+        <Style x:Key="SourceChipToggle" TargetType="ToggleButton">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Padding" Value="8,2"/>
+            <Setter Property="Margin" Value="0,0,4,4"/>
+            <Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource ForegroundMutedBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="10"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentBrush}"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.85"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- TextBox Style -->
         <Style x:Key="SearchBox" TargetType="TextBox">
             <Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/>
@@ -121,16 +157,39 @@
         <Style x:Key="LogListViewItem" TargetType="ListViewItem">
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
             <Setter Property="Padding" Value="0"/>
-            <Setter Property="BorderThickness" Value="0,0,0,1"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
-            <Style.Triggers>
-                <Trigger Property="IsSelected" Value="True">
-                    <Setter Property="Background" Value="{DynamicResource SelectionBrush}"/>
-                </Trigger>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}"/>
-                </Trigger>
-            </Style.Triggers>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListViewItem">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderThickness="0" SnapsToDevicePixels="True">
+                            <GridViewRowPresenter
+                                HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                VerticalAlignment="Center"
+                                Columns="{Binding Path=View.Columns,
+                                    RelativeSource={RelativeSource AncestorType=ListView}}"
+                                Content="{TemplateBinding Content}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource HoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SelectionBrush}"/>
+                            </Trigger>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsSelected" Value="True"/>
+                                    <Condition Property="IsMouseOver" Value="True"/>
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SelectionBrush}"/>
+                            </MultiTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <!-- GridViewColumnHeader style -->
@@ -419,22 +478,8 @@
                     </Border>
                 </StackPanel>
 
-                <!-- Right: Theme toggle + export -->
+                <!-- Right: Theme toggle -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button Content="💾 CSV (전체)" Style="{StaticResource SecondaryButton}"
-                            Command="{Binding ExportCsvCommand}" Margin="0,0,6,0"
-                            ToolTip="현재 표시 목록 전체를 CSV로 저장 (제외 반영)"/>
-                    <Button Content="💾 TXT (전체)" Style="{StaticResource SecondaryButton}"
-                            Command="{Binding ExportTxtCommand}" Margin="0,0,8,0"
-                            ToolTip="현재 표시 목록 전체를 원문 줄 TXT로 저장 (제외 반영)"/>
-                    <Button x:Name="ExportSelectedCsvButton" Content="💾 선택 CSV" IsEnabled="False"
-                            Style="{StaticResource SecondaryButton}" Margin="0,0,6,0"
-                            Click="ExportSelectedCsv_Click"
-                            ToolTip="목록에서 선택한 줄만 CSV로 저장 (Ctrl·Shift로 다중 선택)"/>
-                    <Button x:Name="ExportSelectedTxtButton" Content="💾 선택 TXT" IsEnabled="False"
-                            Style="{StaticResource SecondaryButton}" Margin="0,0,12,0"
-                            Click="ExportSelectedTxt_Click"
-                            ToolTip="목록에서 선택한 줄만 원문 TXT로 저장 (Ctrl·Shift로 다중 선택)"/>
                     <Button Style="{StaticResource SecondaryButton}"
                             Command="{Binding ToggleDarkModeCommand}" Padding="10,6">
                         <Grid Width="18">
@@ -491,7 +536,7 @@
                                             </ItemsControl.ItemsPanel>
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate>
-                                                    <TextBlock Text="{Binding Converter={StaticResource PathToFileName}}"
+                                                    <TextBlock Text="{Binding Mode=OneWay}"
                                                                FontSize="11"
                                                                Foreground="{DynamicResource ForegroundMutedBrush}"
                                                                Margin="0,0,10,0" VerticalAlignment="Center"/>
@@ -613,25 +658,12 @@
                                     </StackPanel>
                                 </Grid>
 
-                                <!-- 소스 필터: 체크된 소스만 표시 -->
+                                <!-- 소스 필터: 켜진 칩만 목록에 표시 -->
                                 <StackPanel Margin="0,8,0,0"
                                             Visibility="{Binding HasSourceFilters, Converter={StaticResource BoolToVis}}">
-                                    <DockPanel Margin="0,0,0,4">
-                                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal"
-                                                    HorizontalAlignment="Right">
-                                            <Button Content="전체" Command="{Binding SelectAllSourcesCommand}"
-                                                    Style="{StaticResource SecondaryButton}"
-                                                    Padding="8,2" FontSize="11" Margin="0,0,4,0"
-                                                    ToolTip="모든 소스 표시"/>
-                                            <Button Content="해제" Command="{Binding DeselectAllSourcesCommand}"
-                                                    Style="{StaticResource SecondaryButton}"
-                                                    Padding="8,2" FontSize="11"
-                                                    ToolTip="모든 소스 숨김"/>
-                                        </StackPanel>
-                                        <TextBlock Text="소스 필터" FontSize="11" FontWeight="SemiBold"
-                                                   Foreground="{DynamicResource ForegroundMutedBrush}"
-                                                   VerticalAlignment="Center"/>
-                                    </DockPanel>
+                                    <TextBlock Text="소스" FontSize="11" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource ForegroundMutedBrush}"
+                                               Margin="0,0,0,4"/>
                                     <ScrollViewer MaxHeight="72" VerticalScrollBarVisibility="Auto"
                                                   HorizontalScrollBarVisibility="Disabled">
                                         <ItemsControl ItemsSource="{Binding SourceFilters}">
@@ -642,10 +674,10 @@
                                             </ItemsControl.ItemsPanel>
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate>
-                                                    <CheckBox IsChecked="{Binding IsIncluded}"
-                                                              Content="{Binding DisplayText}"
-                                                              Margin="0,0,12,4"
-                                                              ToolTip="체크된 소스만 목록에 표시"/>
+                                                    <ToggleButton Style="{StaticResource SourceChipToggle}"
+                                                                  IsChecked="{Binding IsIncluded}"
+                                                                  Content="{Binding DisplayText}"
+                                                                  ToolTip="클릭하여 소스 표시/숨김"/>
                                                 </DataTemplate>
                                             </ItemsControl.ItemTemplate>
                                         </ItemsControl>
@@ -659,10 +691,9 @@
                             <ListView x:Name="LogListView"
                                       Style="{StaticResource LogListView}"
                                       ItemContainerStyle="{StaticResource LogListViewItem}"
-                                      ItemsSource="{Binding FilteredView}"
+                                      ItemsSource="{Binding FilteredEntries}"
                                       SelectedItem="{Binding SelectedEntry}"
                                       SelectionMode="Extended"
-                                      SelectionChanged="AnyLogList_SelectionChanged"
                                       PreviewMouseWheel="LogListView_PreviewMouseWheel"
                                       BorderThickness="0,0,0,0">
                                 <ListView.LayoutTransform>
@@ -672,6 +703,8 @@
                                     <ContextMenu>
                                         <MenuItem Header="전체 복사" Click="CopyAll_Click"/>
                                         <MenuItem Header="메시지만 복사" Click="CopyMessage_Click"/>
+                                        <Separator/>
+                                        <MenuItem Header="메모장으로 보기" Click="ViewInNotepad_Click"/>
                                     </ContextMenu>
                                 </ListView.ContextMenu>
                                 <ListView.View>
@@ -679,7 +712,7 @@
                                         <GridViewColumn Header="#" Width="55">
                                             <GridViewColumn.CellTemplate>
                                                 <DataTemplate>
-                                                    <TextBlock Text="{Binding LineNumber}"
+                                                    <TextBlock Text="{Binding LineNumber, Mode=OneTime}"
                                                                Foreground="{DynamicResource ForegroundMutedBrush}"
                                                                FontSize="11" Padding="4,3"/>
                                                 </DataTemplate>
@@ -688,7 +721,7 @@
                                         <GridViewColumn Header="시각" Width="100">
                                             <GridViewColumn.CellTemplate>
                                                 <DataTemplate>
-                                                    <TextBlock Text="{Binding TimestampDisplay}"
+                                                    <TextBlock Text="{Binding TimestampDisplay, Mode=OneTime}"
                                                                FontFamily="맑은 고딕" FontSize="12" Padding="4,3"/>
                                                 </DataTemplate>
                                             </GridViewColumn.CellTemplate>
@@ -697,10 +730,10 @@
                                             <GridViewColumn.CellTemplate>
                                                 <DataTemplate>
                                                     <Border CornerRadius="3" Margin="2"
-                                                            Background="{Binding LevelDisplay, Converter={StaticResource LevelToBg}}"
+                                                            Background="{Binding LevelDisplay, Mode=OneTime, Converter={StaticResource LevelToBg}}"
                                                             Padding="5,2">
                                                         <TextBlock Text="{Binding LevelDisplay}"
-                                                                   Foreground="{Binding LevelDisplay, Converter={StaticResource LevelToBrush}}"
+                                                                   Foreground="{Binding LevelDisplay, Mode=OneTime, Converter={StaticResource LevelToBrush}}"
                                                                    FontWeight="Bold" FontSize="11"
                                                                    HorizontalAlignment="Center"/>
                                                     </Border>
@@ -710,7 +743,7 @@
                                         <GridViewColumn Header="소스" Width="70">
                                             <GridViewColumn.CellTemplate>
                                                 <DataTemplate>
-                                                    <TextBlock Text="{Binding Source}"
+                                                    <TextBlock Text="{Binding Source, Mode=OneTime}"
                                                                Foreground="{DynamicResource AccentBrush}"
                                                                FontSize="11" Padding="4,3"
                                                                TextTrimming="CharacterEllipsis"/>
@@ -720,22 +753,21 @@
                                         <GridViewColumn Header="메시지" Width="550">
                                             <GridViewColumn.CellTemplate>
                                                 <DataTemplate>
-                                                    <TextBlock Text="{Binding Message}"
+                                                    <TextBlock Text="{Binding MessageDisplay, Mode=OneTime}"
                                                                FontFamily="맑은 고딕" FontSize="12"
-                                                               Foreground="{DynamicResource ForegroundBrush}"
                                                                TextTrimming="CharacterEllipsis" Padding="4,3"
-                                                               ToolTip="{Binding RawLine}"/>
+                                                               ToolTip="{Binding RawLine, Mode=OneTime}"/>
                                                 </DataTemplate>
                                             </GridViewColumn.CellTemplate>
                                         </GridViewColumn>
-                                        <GridViewColumn Header="소스" Width="500">
+                                        <GridViewColumn Header="스택 트레이스" Width="500">
                                             <GridViewColumn.CellTemplate>
                                                 <DataTemplate>
-                                                    <TextBlock Text="{Binding CallStack}"
+                                                    <TextBlock Text="{Binding CallStackDisplay, Mode=OneTime}"
                                                                FontFamily="맑은 고딕" FontSize="11"
                                                                Foreground="{DynamicResource ForegroundMutedBrush}"
                                                                TextTrimming="CharacterEllipsis" Padding="4,3"
-                                                               ToolTip="{Binding CallStack}"/>
+                                                               ToolTip="{Binding CallStack, Mode=OneTime}"/>
                                                 </DataTemplate>
                                             </GridViewColumn.CellTemplate>
                                         </GridViewColumn>
@@ -753,19 +785,6 @@
                                            HorizontalAlignment="Center"/>
                             </StackPanel>
 
-                            <!-- Loading indicator -->
-                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"
-                                        Visibility="{Binding IsLoading, Converter={StaticResource BoolToVis}}">
-                                <TextBlock FontSize="14" Foreground="{DynamicResource AccentBrush}"
-                                           HorizontalAlignment="Center" Margin="0,0,0,10">
-                                    <Run Text="⟳ 로딩 중...  "/>
-                                    <Run Text="{Binding LoadProgress, Mode=OneWay}"/>
-                                    <Run Text="%"/>
-                                </TextBlock>
-                                <ProgressBar Value="{Binding LoadProgress, Mode=OneWay}" Maximum="100" Height="6"
-                                             Width="300" Foreground="{DynamicResource AccentBrush}"
-                                             Background="{DynamicResource SurfaceAltBrush}"/>
-                            </StackPanel>
                         </Grid>
                     </Grid>
                 </Border>

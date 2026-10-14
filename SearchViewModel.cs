@@ -4,7 +4,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using System.Windows.Input;
 
 namespace LogViewer
@@ -14,9 +14,8 @@ namespace LogViewer
         private readonly Func<IEnumerable<LogEntry>> _getEntries;
         private readonly Action<LogEntry> _navigate;
         private string _query = string.Empty;
-        private bool _useRegex;
-        private string _regexError = string.Empty;
         private LogEntry _selectedResult;
+        private bool _isSearching;
 
         public SearchViewModel(Func<IEnumerable<LogEntry>> getEntries, Action<LogEntry> navigate)
         {
@@ -43,24 +42,6 @@ namespace LogViewer
             }
         }
 
-        public bool UseRegex
-        {
-            get => _useRegex;
-            set
-            {
-                if (_useRegex == value) return;
-                _useRegex = value;
-                OnPropertyChanged();
-                RegexError = string.Empty;
-            }
-        }
-
-        public string RegexError
-        {
-            get => _regexError;
-            private set { _regexError = value; OnPropertyChanged(); }
-        }
-
         public LogEntry SelectedResult
         {
             get => _selectedResult;
@@ -73,7 +54,7 @@ namespace LogViewer
             }
         }
 
-        public ObservableCollection<LogEntry> Results { get; } = new ObservableCollection<LogEntry>();
+        public RangeObservableCollection<LogEntry> Results { get; } = new RangeObservableCollection<LogEntry>();
 
         public string ResultSummary
         {
@@ -88,65 +69,62 @@ namespace LogViewer
 
         public bool HasRecentSearches => RecentSearches.Count > 0;
 
+        public bool IsBusy => _isSearching;
+        public string BusyMessage => _isSearching ? "검색 중..." : string.Empty;
+        public int BusyProgress => -1;
+
         public ICommand SearchCommand { get; }
         public ICommand GoToCommand { get; }
         public ICommand ApplyRecentSearchCommand { get; }
         public ICommand RemoveRecentSearchCommand { get; }
         public ICommand ClearRecentSearchesCommand { get; }
 
-        public void RunSearch()
+        private int _searchVersion;
+
+        public async void RunSearch()
         {
+            int version = ++_searchVersion;
             Results.Clear();
             SelectedResult = null;
-            RegexError = string.Empty;
             OnPropertyChanged(nameof(ResultSummary));
 
-            if (string.IsNullOrWhiteSpace(Query))
+            string query = Query;
+            if (string.IsNullOrWhiteSpace(query))
                 return;
 
-            IEnumerable<LogEntry> source;
+            _isSearching = true;
+            NotifyBusy();
+
+            LogEntry[] snapshot; // UI 스레드에서 스냅샷 → 백그라운드에서 안전하게 순회
             try
             {
-                source = _getEntries() ?? Enumerable.Empty<LogEntry>();
+                snapshot = (_getEntries() ?? Enumerable.Empty<LogEntry>()).ToArray();
             }
             catch
             {
+                if (version == _searchVersion) { _isSearching = false; NotifyBusy(); }
                 return;
             }
 
-            if (UseRegex)
-            {
-                Regex rx;
-                try
-                {
-                    rx = new Regex(Query, RegexOptions.IgnoreCase | RegexOptions.Compiled);
-                }
-                catch (ArgumentException)
-                {
-                    RegexError = "잘못된 정규식";
-                    return;
-                }
+            var found = await Task.Run(() => snapshot.AsParallel().AsOrdered()
+                .Where(e => e != null && (e.RawLine ?? string.Empty).IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0)
+                .ToList());
 
-                foreach (var e in source)
-                {
-                    if (e != null && rx.IsMatch(e.RawLine ?? string.Empty))
-                        Results.Add(e);
-                }
-            }
-            else
-            {
-                foreach (var e in source)
-                {
-                    if (e == null) continue;
-                    if ((e.RawLine ?? string.Empty).IndexOf(Query, StringComparison.OrdinalIgnoreCase) >= 0)
-                        Results.Add(e);
-                }
-            }
-
+            if (version != _searchVersion) return; // 더 새로운 검색이 시작됨
+            Results.AddRange(found);
             OnPropertyChanged(nameof(ResultSummary));
+            _isSearching = false;
+            NotifyBusy();
 
             RecentSearchesService.Add(Query);
             LoadRecentSearches();
+        }
+
+        private void NotifyBusy()
+        {
+            OnPropertyChanged(nameof(IsBusy));
+            OnPropertyChanged(nameof(BusyMessage));
+            OnPropertyChanged(nameof(BusyProgress));
         }
 
         private void LoadRecentSearches()

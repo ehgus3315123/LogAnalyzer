@@ -194,6 +194,7 @@ namespace LogViewer
                 {
                     entry.Timestamp = logDate.Date.AddHours(h).AddMinutes(mi).AddSeconds(s).AddMilliseconds(ms);
                 }
+                entry.TimestampText = line.Substring(0, 12); // HH.MM.SS.mmm 고정 폭(정규식 보장)
 
                 entry.Level = NormalizeLevel(m.Groups["lvl"].Value);
                 entry.Source = m.Groups["src"].Value.Trim();
@@ -209,6 +210,7 @@ namespace LogViewer
             {
                 TryParseTimestamp(m.Groups["ts"].Value, out var ts);
                 entry.Timestamp = ts;
+                entry.TimestampText = m.Groups["ts"].Value;
                 string lvl = m.Groups["lvl"].Success ? m.Groups["lvl"].Value : m.Groups["lvl2"].Value;
                 entry.Level = NormalizeLevel(lvl);
                 if (m.Groups["src"].Success) entry.Source = m.Groups["src"].Value.Trim('[', ']');
@@ -220,6 +222,7 @@ namespace LogViewer
             m = SerilogPattern.Match(line);
             if (m.Success)
             {
+                entry.TimestampText = m.Groups["ts"].Value;
                 entry.Level = NormalizeLevel(m.Groups["lvl"].Value);
                 entry.Message = m.Groups["msg"].Value.Trim();
                 return entry;
@@ -230,8 +233,12 @@ namespace LogViewer
             if (m.Success) entry.Level = NormalizeLevel(m.Groups["lvl"].Value);
 
             var tsMatch = Regex.Match(line, @"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}");
-            if (tsMatch.Success && TryParseTimestamp(tsMatch.Value, out var ts2))
-                entry.Timestamp = ts2;
+            if (tsMatch.Success)
+            {
+                entry.TimestampText = tsMatch.Value;
+                if (TryParseTimestamp(tsMatch.Value, out var ts2))
+                    entry.Timestamp = ts2;
+            }
 
             return entry;
         }

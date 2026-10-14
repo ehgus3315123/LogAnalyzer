@@ -7,12 +7,22 @@ namespace LogViewer
 {
     public partial class SearchWindow : Window
     {
+        private readonly ProgressHost _progress;
+
         public SearchWindow(Func<IEnumerable<LogEntry>> getEntries, Action<LogEntry> navigateToEntry)
         {
             InitializeComponent();
             var vm = new SearchViewModel(getEntries, navigateToEntry);
             vm.FocusQueryBox = () => { QueryBox.Focus(); QueryBox.SelectAll(); };
             DataContext = vm;
+            _progress = new ProgressHost(this);
+            vm.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(SearchViewModel.IsBusy) ||
+                    e.PropertyName == nameof(SearchViewModel.BusyMessage) ||
+                    e.PropertyName == nameof(SearchViewModel.BusyProgress))
+                    _progress.Sync(vm.IsBusy, vm.BusyMessage, vm.BusyProgress);
+            };
         }
 
         private void SearchWindow_OnLoaded(object sender, RoutedEventArgs e)

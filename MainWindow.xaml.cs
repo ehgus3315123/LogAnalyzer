@@ -1,4 +1,6 @@
 using System;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -15,6 +17,7 @@ namespace LogViewer
             new InputGestureCollection { new KeyGesture(Key.F, ModifierKeys.Control | ModifierKeys.Shift) });
 
         private readonly MainWindowViewModel _vm;
+        private readonly ProgressHost _progress;
         private SearchWindow _searchWindow;
 
         public MainWindow()
@@ -24,6 +27,14 @@ namespace LogViewer
 
             _vm = new MainWindowViewModel();
             DataContext = _vm;
+            _progress = new ProgressHost(this);
+            _vm.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(MainWindowViewModel.IsBusy) ||
+                    e.PropertyName == nameof(MainWindowViewModel.BusyMessage) ||
+                    e.PropertyName == nameof(MainWindowViewModel.BusyProgress))
+                    _progress.Sync(_vm.IsBusy, _vm.BusyMessage, _vm.BusyProgress);
+            };
 
             var v = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
             Title = $"Log Viewer {v.Major}.{v.Minor}";
@@ -99,25 +110,6 @@ namespace LogViewer
             {
                 _vm.AddFilePaths(paths);
             }
-        }
-
-        private void AnyLogList_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            int n = GetSelectedEntries().Count;
-            ExportSelectedCsvButton.IsEnabled = n > 0;
-            ExportSelectedTxtButton.IsEnabled = n > 0;
-        }
-
-        private void ExportSelectedCsv_Click(object sender, RoutedEventArgs e)
-        {
-            var items = GetSelectedEntries();
-            _vm.ExportSelectedCsv(items);
-        }
-
-        private void ExportSelectedTxt_Click(object sender, RoutedEventArgs e)
-        {
-            var items = GetSelectedEntries();
-            _vm.ExportSelectedTxt(items);
         }
 
         private void OpenSearch_Click(object sender, RoutedEventArgs e) => ShowSearchWindow();
@@ -259,6 +251,25 @@ namespace LogViewer
             if (entries.Count == 0) return;
             var text = string.Join(Environment.NewLine, entries.Select(x => $"{x.TimestampDisplay}\t{x.Message}"));
             Clipboard.SetText(text);
+        }
+
+        // ponytail: 고정 파일명 재사용 — 매번 새 파일을 만들면 temp 누적. 메모장이 이미 열려있으면 덮어쓴다.
+        private static readonly string _notepadTempPath =
+            Path.Combine(Path.GetTempPath(), "LogViewer_preview.txt");
+
+        private void ViewInNotepad_Click(object sender, RoutedEventArgs e)
+        {
+            var entries = GetSelectedEntries();
+            if (entries.Count == 0) return;
+
+            var text = string.Join(Environment.NewLine, entries.Select(x => x.RawLine ?? string.Empty));
+            File.WriteAllText(_notepadTempPath, text);
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = "notepad.exe",
+                Arguments = $"\"{_notepadTempPath}\"",
+                UseShellExecute = true
+            });
         }
 
         private System.Collections.Generic.List<LogEntry> GetSelectedEntries()

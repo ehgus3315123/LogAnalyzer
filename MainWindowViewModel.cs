@@ -6,9 +6,11 @@ using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Data;
 using System.Windows.Input;
+using System.Windows.Threading;
 using Microsoft.Win32;
 
 namespace LogViewer
@@ -39,7 +41,18 @@ namespace LogViewer
         // ── Recent files ─────────────────────────────────────────────────
         public ObservableCollection<RecentFileItem> RecentFiles { get; } = new ObservableCollection<RecentFileItem>();
         public bool HasRecentFiles => RecentFiles.Count > 0;
-        public ListCollectionView FilteredView { get; }
+        // ponytail: ICollectionView.Filter는 UI 스레드에서 항목을 하나씩 동기 평가해 대용량에서 UI가 멈춤.
+        // 백그라운드에서 병렬 필터링 후 결과 리스트를 통째로 교체한다.
+        private IReadOnlyList<LogEntry> _filteredEntries = Array.Empty<LogEntry>();
+        public IReadOnlyList<LogEntry> FilteredEntries
+        {
+            get => _filteredEntries;
+            private set { _filteredEntries = value; OnPropertyChanged(); OnPropertyChanged(nameof(FilteredCount)); OnPropertyChanged(nameof(IsEmpty)); }
+        }
+        private CancellationTokenSource _filterCts;
+        private bool _isFiltering;
+        private bool _isUpdatingList;
+        private bool _suppressFilterApply;
         public ObservableCollection<string> LoadedFiles { get; } = new ObservableCollection<string>();
         public ObservableCollection<FilterChip> FilterChips { get; } = new ObservableCollection<FilterChip>();
         public ObservableCollection<FilterChip> ExcludeChips { get; } = new ObservableCollection<FilterChip>();
@@ -53,7 +66,7 @@ namespace LogViewer
         private int _pendingLoads;
 
         // ── Filter object (stateless snapshot, rebuilt on change) ─────────
-        private readonly LogFilter _filter = new LogFilter();
+        private LogFilter _filter = new LogFilter();
 
         private static readonly string FilterFolder = @"C:\PDHLogFilter";
         private static readonly string IncludeFile = Path.Combine(FilterFolder, "include.txt");
@@ -68,25 +81,18 @@ namespace LogViewer
 
         public MainWindowViewModel()
         {
-            FilteredView = new ListCollectionView(_allEntries);
-            FilteredView.Filter = FilterPredicate;
-
             OpenFileCommand = new RelayCommand(OpenFile);
             ClearFilesCommand = new RelayCommand(ClearFiles, () => _allEntries.Count > 0 && !_isLoading);
-            ExportCsvCommand = new RelayCommand(ExportCsv, () => FilteredCount > 0);
-            ExportTxtCommand = new RelayCommand(ExportTxt, () => FilteredCount > 0);
             ToggleDarkModeCommand = new RelayCommand(ToggleDarkMode);
             ResetToStartupCommand = new RelayCommand(_ => ResetToStartup());
             AddFilterChipCommand = new RelayCommand(AddFilterChip);
             AddExcludeChipCommand = new RelayCommand(AddExcludeChip);
-            SelectAllSourcesCommand = new RelayCommand(SelectAllSources, () => SourceFilters.Count > 0);
-            DeselectAllSourcesCommand = new RelayCommand(DeselectAllSources, () => SourceFilters.Count > 0);
             OpenRecentFileCommand = new RelayCommand(OpenRecentFile);
             ClearRecentFilesCommand = new RelayCommand(ClearRecentFiles);
             RefreshFilesCommand = new RelayCommand(RefreshLoadedFiles, () => LoadedFiles.Count > 0 && !_isLoading);
 
-            FilterChips.CollectionChanged += (_, __) => { SaveFilterChips(); ApplyFilter(); };
-            ExcludeChips.CollectionChanged += (_, __) => { SaveExcludeChips(); ApplyFilter(); };
+            FilterChips.CollectionChanged += (_, __) => { SaveFilterChips(); if (!_suppressFilterApply) ApplyFilter(); };
+            ExcludeChips.CollectionChanged += (_, __) => { SaveExcludeChips(); if (!_suppressFilterApply) ApplyFilter(); };
             RecentFiles.CollectionChanged += (_, __) => OnPropertyChanged(nameof(HasRecentFiles));
 
             LoadExcludedSources();
@@ -120,14 +126,37 @@ namespace LogViewer
         public bool IsLoading
         {
             get => _isLoading;
-            private set { _isLoading = value; OnPropertyChanged(); OnPropertyChanged(nameof(IsEmpty)); }
+            private set
+            {
+                _isLoading = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(IsEmpty));
+                NotifyBusy();
+            }
         }
 
         public int LoadProgress
         {
             get => _loadProgress;
-            private set { _loadProgress = value; OnPropertyChanged(); }
+            private set { _loadProgress = value; OnPropertyChanged(); NotifyBusy(); }
         }
+
+        /// <summary>로드·필터·목록 갱신 등 긴 작업 중이면 true. ProgressWindow 표시용.</summary>
+        public bool IsBusy => _isLoading || _isFiltering || _isUpdatingList;
+
+        public string BusyMessage
+        {
+            get
+            {
+                if (_isLoading) return $"파일 로딩 중... {_loadProgress}%";
+                if (_isUpdatingList) return "목록 갱신 중...";
+                if (_isFiltering) return "필터 적용 중...";
+                return string.Empty;
+            }
+        }
+
+        /// <summary>0–100, 또는 미정 진행이면 -1.</summary>
+        public int BusyProgress => _isLoading ? _loadProgress : -1;
 
         public string StatusText
         {
@@ -173,21 +202,17 @@ namespace LogViewer
         public int ErrorCount { get => _errorCount; private set { _errorCount = value; OnPropertyChanged(); } }
         public int WarnCount { get => _warnCount; private set { _warnCount = value; OnPropertyChanged(); } }
 
-        public int FilteredCount => FilteredView?.Count ?? 0;
-        public bool IsEmpty => !_isLoading && FilteredCount == 0;
+        public int FilteredCount => _filteredEntries.Count;
+        public bool IsEmpty => !_isLoading && !_isFiltering && FilteredCount == 0;
         public bool HasSourceFilters => SourceFilters.Count > 0;
 
         // ── Commands ──────────────────────────────────────────────────────
         public ICommand OpenFileCommand { get; }
         public ICommand ClearFilesCommand { get; }
-        public ICommand ExportCsvCommand { get; }
-        public ICommand ExportTxtCommand { get; }
         public ICommand ToggleDarkModeCommand { get; }
         public ICommand ResetToStartupCommand { get; }
         public ICommand AddFilterChipCommand { get; }
         public ICommand AddExcludeChipCommand { get; }
-        public ICommand SelectAllSourcesCommand { get; }
-        public ICommand DeselectAllSourcesCommand { get; }
         public ICommand OpenRecentFileCommand { get; }
         public ICommand ClearRecentFilesCommand { get; }
         public ICommand RefreshFilesCommand { get; }
@@ -280,6 +305,7 @@ namespace LogViewer
             Directory.CreateDirectory(FilterFolder);
 
             _suppressFilterSave = true;
+            _suppressFilterApply = true;
             try
             {
                 foreach (var kw in ReadKeywords(IncludeFile))
@@ -294,6 +320,7 @@ namespace LogViewer
             finally
             {
                 _suppressFilterSave = false;
+                _suppressFilterApply = false;
             }
         }
 
@@ -344,20 +371,17 @@ namespace LogViewer
             catch { /* 저장 실패는 무시 — 필터 동작에는 영향 없음 */ }
         }
 
-        private void RefreshSourceFilters()
+        // groups: (소스, 개수) — 백그라운드에서 미리 집계해 넘긴다.
+        private void RefreshSourceFilters(IEnumerable<KeyValuePair<string, int>> groups)
         {
             _suppressSourceFilterCallback = true;
             try
             {
                 SourceFilters.Clear();
-                foreach (var group in _allEntries
-                    .GroupBy(e => e.Source ?? string.Empty, StringComparer.OrdinalIgnoreCase)
-                    .OrderByDescending(g => g.Count())
-                    .ThenBy(g => g.Key, StringComparer.OrdinalIgnoreCase))
+                foreach (var group in groups)
                 {
-                    string source = group.Key;
-                    bool included = !_excludedSources.Contains(source);
-                    SourceFilters.Add(new SourceExcludeItem(source, group.Count(), included, OnSourceInclusionChanged));
+                    bool included = !_excludedSources.Contains(group.Key);
+                    SourceFilters.Add(new SourceExcludeItem(group.Key, group.Value, included, OnSourceInclusionChanged));
                 }
             }
             finally
@@ -382,42 +406,6 @@ namespace LogViewer
             _excludedSources = new HashSet<string>(
                 SourceFilters.Where(s => !s.IsIncluded).Select(s => s.Source),
                 StringComparer.OrdinalIgnoreCase);
-        }
-
-        private void SelectAllSources()
-        {
-            _suppressSourceFilterCallback = true;
-            try
-            {
-                foreach (var item in SourceFilters)
-                    item.IsIncluded = true;
-            }
-            finally
-            {
-                _suppressSourceFilterCallback = false;
-            }
-
-            _excludedSources.Clear();
-            SaveExcludedSources();
-            ApplyFilter();
-        }
-
-        private void DeselectAllSources()
-        {
-            _suppressSourceFilterCallback = true;
-            try
-            {
-                foreach (var item in SourceFilters)
-                    item.IsIncluded = false;
-            }
-            finally
-            {
-                _suppressSourceFilterCallback = false;
-            }
-
-            SyncExcludedSourcesFromUi();
-            SaveExcludedSources();
-            ApplyFilter();
         }
 
         // ── Command Implementations ───────────────────────────────────────
@@ -504,16 +492,19 @@ namespace LogViewer
             var loader = new LogLoader();
             _activeLoaders.Add(loader);
 
-            loader.Progress += (s, e) => Application.Current?.Dispatcher.Invoke(() =>
+            loader.Progress += (s, e) => Application.Current?.Dispatcher.BeginInvoke(new Action(() =>
             {
                 LoadProgress = e.Percent;
                 StatusText = $"로딩 중: {Path.GetFileName(e.FileName)} ({e.Percent}%)";
-            });
+            }));
 
-            loader.Completed += (s, e) => Application.Current?.Dispatcher.Invoke(() =>
+            loader.Completed += (s, e) => Application.Current?.Dispatcher.BeginInvoke(new Action(async () =>
             {
+                // ponytail: ClearFiles()가 _pendingLoads=0으로 리셋한 뒤 지연 도착한 콜백 무시
+                if (!_activeLoaders.Contains(loader)) return;
+
                 _activeLoaders.Remove(loader);
-                _pendingLoads--;
+                if (_pendingLoads > 0) _pendingLoads--;
 
                 if (e.Error != null)
                 {
@@ -523,7 +514,12 @@ namespace LogViewer
                 {
                     LoadProgress = 100;
                     StatusText = $"로딩 마무리 중: {Path.GetFileName(e.FileName)} (목록 반영)";
+                    _isUpdatingList = true;
+                    NotifyBusy();
+                    await Dispatcher.Yield(DispatcherPriority.Background);
                     _allEntries.AddRange(e.Entries);
+                    _isUpdatingList = false;
+                    NotifyBusy();
                     RecordRecentFile(e.FileName);
                 }
 
@@ -531,14 +527,10 @@ namespace LogViewer
                 {
                     IsLoading = false;
                     LoadProgress = 100;
-                    RefreshStatistics();
-                    RefreshSourceFilters();
-                    FilteredView.Refresh();
-                    OnPropertyChanged(nameof(FilteredCount));
-                    OnPropertyChanged(nameof(IsEmpty));
-                    UpdateStatus();
+                    RefreshStatsAsync();
+                    ApplyFilter();
                 }
-            });
+            }));
 
             loader.LoadAsync(path);
         }
@@ -551,13 +543,17 @@ namespace LogViewer
             _pendingLoads = 0;
             _allEntries.Clear();
             LoadedFiles.Clear();
+            _statsVersion++;
             RefreshStatistics();
-            RefreshSourceFilters();
-            FilteredView.Refresh();
-            OnPropertyChanged(nameof(FilteredCount));
+            RefreshSourceFilters(Array.Empty<KeyValuePair<string, int>>());
+            _filterCts?.Cancel();
+            _isFiltering = false;
+            _isUpdatingList = false;
+            FilteredEntries = Array.Empty<LogEntry>();
             StatusText = "로그 파일을 불러오세요";
             LoadProgress = 0;
             IsLoading = false;
+            NotifyBusy();
         }
 
         /// <summary>현재 로드된 파일을 디스크에서 다시 읽습니다. 필터는 유지합니다.</summary>
@@ -592,135 +588,6 @@ namespace LogViewer
             ExcludeKeyword = string.Empty;
         }
 
-        private void ExportCsv()
-        {
-            var dlg = new SaveFileDialog
-            {
-                Title = "CSV로보내기 (표시 결과 전체)",
-                Filter = "CSV 파일 (*.csv)|*.csv",
-                FileName = $"log_export_{DateTime.Now:yyyyMMdd_HHmmss}.csv"
-            };
-            if (dlg.ShowDialog() != true) return;
-
-            try
-            {
-                WriteCsvFile(dlg.FileName, FilteredView.Cast<LogEntry>());
-                StatusText = $"CSV 저장 완료: {Path.GetFileName(dlg.FileName)}";
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"저장 실패: {ex.Message}", "오류", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-
-        private void ExportTxt()
-        {
-            var dlg = new SaveFileDialog
-            {
-                Title = "TXT로보내기 (표시 결과 전체)",
-                Filter = "텍스트 파일 (*.txt)|*.txt",
-                FileName = $"log_export_{DateTime.Now:yyyyMMdd_HHmmss}.txt"
-            };
-            if (dlg.ShowDialog() != true) return;
-
-            try
-            {
-                var lines = FilteredView.Cast<LogEntry>().SelectMany(ToTxtLines);
-                File.WriteAllLines(dlg.FileName, lines, Encoding.UTF8);
-                StatusText = $"TXT 저장 완료: {Path.GetFileName(dlg.FileName)}";
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"저장 실패: {ex.Message}", "오류", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-
-        /// <summary>선택한 항목만 CSV로 저장합니다. 목록에 보이는 순서를 유지합니다.</summary>
-        public void ExportSelectedCsv(IEnumerable<LogEntry> selected)
-        {
-            var ordered = OrderSelectedByFilteredView(selected);
-            if (ordered.Count == 0)
-            {
-                MessageBox.Show("보낼 항목을 로그 목록에서 하나 이상 선택하세요.\n(Ctrl·Shift로 여러 줄 선택)", "선택보내기", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-
-            var dlg = new SaveFileDialog
-            {
-                Title = "선택 항목 CSV로 저장",
-                Filter = "CSV 파일 (*.csv)|*.csv",
-                FileName = $"log_selected_{DateTime.Now:yyyyMMdd_HHmmss}.csv"
-            };
-            if (dlg.ShowDialog() != true) return;
-
-            try
-            {
-                WriteCsvFile(dlg.FileName, ordered);
-                StatusText = $"선택 CSV 저장 완료 ({ordered.Count:N0}건): {Path.GetFileName(dlg.FileName)}";
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"저장 실패: {ex.Message}", "오류", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-
-        /// <summary>선택한 항목의 원문 줄만 TXT로 저장합니다. 목록에 보이는 순서를 유지합니다.</summary>
-        public void ExportSelectedTxt(IEnumerable<LogEntry> selected)
-        {
-            var ordered = OrderSelectedByFilteredView(selected);
-            if (ordered.Count == 0)
-            {
-                MessageBox.Show("보낼 항목을 로그 목록에서 하나 이상 선택하세요.\n(Ctrl·Shift로 여러 줄 선택)", "선택보내기", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-
-            var dlg = new SaveFileDialog
-            {
-                Title = "선택 항목 TXT로 저장",
-                Filter = "텍스트 파일 (*.txt)|*.txt",
-                FileName = $"log_selected_{DateTime.Now:yyyyMMdd_HHmmss}.txt"
-            };
-            if (dlg.ShowDialog() != true) return;
-
-            try
-            {
-                var lines = ordered.SelectMany(ToTxtLines);
-                File.WriteAllLines(dlg.FileName, lines, Encoding.UTF8);
-                StatusText = $"선택 TXT 저장 완료 ({ordered.Count:N0}건): {Path.GetFileName(dlg.FileName)}";
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"저장 실패: {ex.Message}", "오류", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-
-        private IReadOnlyList<LogEntry> OrderSelectedByFilteredView(IEnumerable<LogEntry> selected)
-        {
-            if (selected == null) return Array.Empty<LogEntry>();
-            var set = new HashSet<LogEntry>(selected);
-            return FilteredView.Cast<LogEntry>().Where(e => set.Contains(e)).ToList();
-        }
-
-        private static void WriteCsvFile(string path, IEnumerable<LogEntry> entries)
-        {
-            var sb = new StringBuilder();
-            sb.AppendLine("LineNumber,Timestamp,Level,Source,Message,CallStack");
-            foreach (var e in entries)
-            {
-                sb.AppendLine($"{e.LineNumber}," +
-                              $"\"{e.TimestampDisplay}\"," +
-                              $"{e.LevelDisplay}," +
-                              $"\"{e.Source}\"," +
-                              $"\"{EscapeCsv(e.Message)}\"," +
-                              $"\"{EscapeCsv(e.CallStack)}\"");
-            }
-            File.WriteAllText(path, sb.ToString(), Encoding.UTF8);
-        }
-
-        private static IEnumerable<string> ToTxtLines(LogEntry e)
-        {
-            yield return e.RawLine;
-        }
 
         private void ToggleDarkMode()
         {
@@ -729,24 +596,68 @@ namespace LogViewer
         }
 
         // ── Filter ────────────────────────────────────────────────────────
-        private void ApplyFilter()
+        private async void ApplyFilter()
         {
-            _filter.IncludeChips = FilterChips.Select(c => c.Keyword).ToList();
-            _filter.SearchKeyword = _searchKeyword;
-            _filter.ExcludeChips = ExcludeChips.Select(c => c.Keyword).ToList();
-            _filter.ExcludeKeyword = _excludeKeyword;
-            _filter.ExcludedSources = _excludedSources;
+            _filterCts?.Cancel();
+            var cts = _filterCts = new CancellationTokenSource();
 
-            FilteredView.Refresh();
-            OnPropertyChanged(nameof(FilteredCount));
-            OnPropertyChanged(nameof(IsEmpty));
+            // 스레드에서 안전하게 쓰도록 매번 새 필터/스냅샷 사용 (UI 스레드에서 호출됨)
+            var filter = _filter = new LogFilter
+            {
+                IncludeChips = FilterChips.Select(c => c.Keyword).ToList(),
+                SearchKeyword = _searchKeyword,
+                ExcludeChips = ExcludeChips.Select(c => c.Keyword).ToList(),
+                ExcludeKeyword = _excludeKeyword,
+                ExcludedSources = new HashSet<string>(_excludedSources, StringComparer.OrdinalIgnoreCase),
+            };
+
+            _isFiltering = true;
+            StatusText = "필터 적용 중...";
+            NotifyBusy();
+            await Dispatcher.Yield(DispatcherPriority.Background);
+
+            if (cts.IsCancellationRequested) { FinishFilterBusy(); return; }
+
+            var snapshot = _allEntries.ToArray();
+
+            List<LogEntry> result;
+            try
+            {
+                result = await Task.Run(() => snapshot.AsParallel().AsOrdered()
+                    .WithCancellation(cts.Token).Where(filter.IsMatch).ToList(), cts.Token);
+            }
+            catch (OperationCanceledException) { FinishFilterBusy(); return; }
+
+            if (cts.IsCancellationRequested) { FinishFilterBusy(); return; }
+
+            _isFiltering = false;
+            _isUpdatingList = true;
+            NotifyBusy();
+            await Dispatcher.Yield(DispatcherPriority.Background);
+            FilteredEntries = result;
+            _isUpdatingList = false;
+            NotifyBusy();
             UpdateStatus();
         }
 
-        private bool FilterPredicate(object obj)
+        private void FinishFilterBusy()
         {
-            return obj is LogEntry entry && _filter.IsMatch(entry);
+            // 더 새 필터가 돌고 있으면 그쪽이 busy를 유지한다
+            if (_filterCts != null && !_filterCts.IsCancellationRequested) return;
+            _isFiltering = false;
+            _isUpdatingList = false;
+            NotifyBusy();
         }
+
+        private void NotifyBusy()
+        {
+            OnPropertyChanged(nameof(IsBusy));
+            OnPropertyChanged(nameof(BusyMessage));
+            OnPropertyChanged(nameof(BusyProgress));
+        }
+
+        private static Dispatcher Dispatcher =>
+            Application.Current?.Dispatcher ?? System.Windows.Threading.Dispatcher.CurrentDispatcher;
 
         // ── Statistics ────────────────────────────────────────────────────
         private void RefreshStatistics()
@@ -760,9 +671,42 @@ namespace LogViewer
             });
         }
 
+        private int _statsVersion;
+
+        // 로드 완료 후 레벨 카운트·소스 집계를 백그라운드에서 수행 (UI 스레드 점유 방지)
+        private async void RefreshStatsAsync()
+        {
+            int version = ++_statsVersion;
+            var snapshot = _allEntries.ToArray();
+
+            var r = await Task.Run(() =>
+            {
+                int err = 0, warn = 0;
+                var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                foreach (var e in snapshot)
+                {
+                    var l = e.LevelDisplay;
+                    if (l == "ERROR") err++;
+                    else if (l == "WARN" || l == "WARNING") warn++;
+                    var src = e.Source ?? string.Empty;
+                    counts.TryGetValue(src, out int c);
+                    counts[src] = c + 1;
+                }
+                var groups = counts.OrderByDescending(kv => kv.Value)
+                                   .ThenBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase).ToList();
+                return (err, warn, groups);
+            });
+
+            if (version != _statsVersion) return; // 그 사이 파일이 바뀜
+            ErrorCount = r.err;
+            WarnCount = r.warn;
+            RefreshSourceFilters(r.groups);
+            TotalCount = snapshot.Length; // UpdateStatus 포함
+        }
+
         private void UpdateStatus()
         {
-            if (IsLoading) return;
+            if (IsLoading || _isFiltering) return;
             int total = _allEntries.Count;
             int filtered = FilteredCount;
             StatusText = total == 0
@@ -778,7 +722,6 @@ namespace LogViewer
             entry != null && _filter.IsMatch(entry);
 
         // ── Helpers ───────────────────────────────────────────────────────
-        private static string EscapeCsv(string s) => (s ?? string.Empty).Replace("\"", "\"\"");
 
         public event PropertyChangedEventHandler PropertyChanged;
         private void OnPropertyChanged([CallerMemberName] string name = null) =>

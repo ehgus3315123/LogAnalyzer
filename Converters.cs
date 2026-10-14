@@ -12,9 +12,8 @@ namespace LogViewer
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
             var app = Application.Current;
-            string level = (value as string ?? string.Empty).ToUpperInvariant();
             string key;
-            switch (level)
+            switch (value as string ?? string.Empty)
             {
                 case "ERROR": key = "ErrorBrush"; break;
                 case "WARN":  key = "WarnBrush";  break;
@@ -32,15 +31,22 @@ namespace LogViewer
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
             var app = Application.Current;
-            string level = (value as string ?? string.Empty).ToUpperInvariant();
-            if (level == "ERROR")
+            if (!string.Equals(value as string, "ERROR", StringComparison.OrdinalIgnoreCase))
+                return Brushes.Transparent;
+
+            // ponytail: 행마다 새 브러시를 만들지 않고, 테마(ErrorBrush)가 바뀔 때만 다시 만든다.
+            var brush = app?.TryFindResource("ErrorBrush") as SolidColorBrush;
+            if (brush == null) return Brushes.Transparent;
+            if (!ReferenceEquals(brush, _src))
             {
-                var brush = app?.TryFindResource("ErrorBrush") as SolidColorBrush;
-                if (brush != null)
-                    return new SolidColorBrush(Color.FromArgb(30, brush.Color.R, brush.Color.G, brush.Color.B));
+                var b = new SolidColorBrush(Color.FromArgb(30, brush.Color.R, brush.Color.G, brush.Color.B));
+                b.Freeze();
+                _cached = b;
+                _src = brush;
             }
-            return Brushes.Transparent;
+            return _cached;
         }
+        private SolidColorBrush _src, _cached;
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
             => throw new NotImplementedException();
     }
