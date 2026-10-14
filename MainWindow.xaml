@@ -499,6 +499,18 @@
                                             </ItemsControl.ItemTemplate>
                                         </ItemsControl>
                                     </StackPanel>
+                                    <!-- 글자 크기 -->
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                        <Button Content="컬럼 ▾" Click="ColumnsButton_Click" Style="{StaticResource SecondaryButton}"
+                                                Padding="8,1" Margin="0,0,10,0" ToolTip="표시할 컬럼 선택"/>
+                                        <Button Content="A−" Click="FontSmaller_Click" Style="{StaticResource SecondaryButton}"
+                                                Padding="8,1" ToolTip="글자 작게 (Ctrl+휠)"/>
+                                        <Button x:Name="FontScaleButton" Content="100%" Click="FontReset_Click"
+                                                Style="{StaticResource SecondaryButton}" Padding="6,1" Margin="4,0"
+                                                MinWidth="48" ToolTip="클릭하면 100%로 되돌립니다"/>
+                                        <Button Content="A+" Click="FontLarger_Click" Style="{StaticResource SecondaryButton}"
+                                                Padding="8,1" ToolTip="글자 크게 (Ctrl+휠)"/>
+                                    </StackPanel>
                                 </Grid>
 
                                 <!-- 키워드 입력 + 추가 버튼 -->
@@ -651,7 +663,11 @@
                                       SelectedItem="{Binding SelectedEntry}"
                                       SelectionMode="Extended"
                                       SelectionChanged="AnyLogList_SelectionChanged"
+                                      PreviewMouseWheel="LogListView_PreviewMouseWheel"
                                       BorderThickness="0,0,0,0">
+                                <ListView.LayoutTransform>
+                                    <ScaleTransform x:Name="ListScale"/>
+                                </ListView.LayoutTransform>
                                 <ListView.ContextMenu>
                                     <ContextMenu>
                                         <MenuItem Header="전체 복사" Click="CopyAll_Click"/>
@@ -669,11 +685,10 @@
                                                 </DataTemplate>
                                             </GridViewColumn.CellTemplate>
                                         </GridViewColumn>
-                                        <GridViewColumn Header="시각" Width="70">
+                                        <GridViewColumn Header="시각" Width="100">
                                             <GridViewColumn.CellTemplate>
                                                 <DataTemplate>
                                                     <TextBlock Text="{Binding TimestampDisplay}"
-                                                               Foreground="{DynamicResource ForegroundMutedBrush}"
                                                                FontFamily="맑은 고딕" FontSize="12" Padding="4,3"/>
                                                 </DataTemplate>
                                             </GridViewColumn.CellTemplate>

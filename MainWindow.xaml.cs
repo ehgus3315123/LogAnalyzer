@@ -185,6 +185,65 @@ namespace LogViewer
             }
         }
 
+        // ponytail: 개별 FontSize 대신 ListView 전체를 스케일(헤더·스크롤바 포함). 저장은 안 함(재시작 시 100%).
+        private void SetListScale(double s)
+        {
+            s = Math.Max(0.7, Math.Min(2.5, Math.Round(s, 1)));
+            ListScale.ScaleX = ListScale.ScaleY = s;
+            FontScaleButton.Content = $"{s:P0}";
+        }
+
+        private void FontSmaller_Click(object sender, RoutedEventArgs e) => SetListScale(ListScale.ScaleX - 0.1);
+        private void FontLarger_Click(object sender, RoutedEventArgs e) => SetListScale(ListScale.ScaleX + 0.1);
+        private void FontReset_Click(object sender, RoutedEventArgs e) => SetListScale(1);
+
+        private void LogListView_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            if (Keyboard.Modifiers != ModifierKeys.Control) return;
+            SetListScale(ListScale.ScaleX + (e.Delta > 0 ? 0.1 : -0.1));
+            e.Handled = true;
+        }
+
+        // ponytail: GridViewColumn엔 Visibility가 없어 Columns에서 빼고 넣는 방식. 숨김 상태는 저장하지 않음.
+        private System.Collections.Generic.List<GridViewColumn> _allColumns;
+        private readonly System.Collections.Generic.HashSet<GridViewColumn> _hiddenColumns =
+            new System.Collections.Generic.HashSet<GridViewColumn>();
+
+        private void ColumnsButton_Click(object sender, RoutedEventArgs e)
+        {
+            var grid = (GridView)LogListView.View;
+            if (_allColumns == null) _allColumns = grid.Columns.ToList();
+
+            var menu = new ContextMenu
+            {
+                PlacementTarget = (UIElement)sender,
+                Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom
+            };
+            foreach (var col in _allColumns)
+            {
+                var c = col;
+                var item = new MenuItem
+                {
+                    Header = c.Header,
+                    IsCheckable = true,
+                    IsChecked = !_hiddenColumns.Contains(c),
+                    StaysOpenOnClick = true
+                };
+                item.Click += (_, __) =>
+                {
+                    if (item.IsChecked) _hiddenColumns.Remove(c);
+                    else if (_hiddenColumns.Count < _allColumns.Count - 1) _hiddenColumns.Add(c);
+                    else item.IsChecked = true; // 최소 1개는 남긴다
+
+                    grid.Columns.Clear();
+                    foreach (var x in _allColumns)
+                        if (!_hiddenColumns.Contains(x)) grid.Columns.Add(x);
+                };
+                menu.Items.Add(item);
+            }
+            menu.IsOpen = true;
+        }
+
         private void CopyAll_Click(object sender, RoutedEventArgs e)
         {
             var entries = GetSelectedEntries();
