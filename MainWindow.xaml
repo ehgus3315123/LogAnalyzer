@@ -32,11 +32,10 @@
             <Setter Property="Padding" Value="14,6"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}" CornerRadius="4"
+                        <Border Background="{TemplateBinding Background}" CornerRadius="2"
                                 Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
@@ -80,7 +79,7 @@
                                 Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="10"
+                                CornerRadius="3"
                                 Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
@@ -113,7 +112,7 @@
                         <Border Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="4">
+                                CornerRadius="2">
                             <ScrollViewer x:Name="PART_ContentHost"
                                           Margin="{TemplateBinding Padding}"
                                           VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
@@ -156,6 +155,7 @@
 
         <Style x:Key="LogListViewItem" TargetType="ListViewItem">
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Height" Value="24"/>
             <Setter Property="Padding" Value="0"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Background" Value="Transparent"/>
@@ -207,7 +207,7 @@
             <Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="CornerRadius" Value="3"/>
             <Setter Property="Padding" Value="12"/>
         </Style>
 
@@ -248,14 +248,14 @@
                             <Run Text="파일을 선택하거나 .log / .txt 파일을 이 창에 드래그하세요."/>
                         </TextBlock>
 
-                        <Button Content="📂  파일 선택"
+                        <Button Content="파일 선택..."
                                 Style="{StaticResource PrimaryButton}"
                                 HorizontalAlignment="Left"
                                 Margin="0,0,0,16"
                                 Command="{Binding OpenFileCommand}"/>
 
                         <!-- Drag hint strip -->
-                        <Border CornerRadius="6" Padding="16,14" BorderThickness="2">
+                        <Border CornerRadius="3" Padding="16,14" BorderThickness="2">
                             <Border.Style>
                                 <Style TargetType="Border">
                                     <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
@@ -291,8 +291,6 @@
                                             </Style.Triggers>
                                         </Style>
                                     </StackPanel.Style>
-                                    <TextBlock Text="📂" FontSize="20" VerticalAlignment="Center"
-                                               Margin="0,0,10,0" Opacity="0.5"/>
                                     <TextBlock Text=".log / .txt 파일을 이 창에 드래그하면 바로 분석을 시작합니다"
                                                Foreground="{DynamicResource ForegroundMutedBrush}"
                                                FontSize="13" VerticalAlignment="Center"/>
@@ -310,7 +308,6 @@
                                             </Style.Triggers>
                                         </Style>
                                     </StackPanel.Style>
-                                    <TextBlock Text="✅" FontSize="24" VerticalAlignment="Center" Margin="0,0,12,0"/>
                                     <TextBlock Text="파일을 놓으면 분석을 시작합니다"
                                                FontSize="14" FontWeight="SemiBold"
                                                Foreground="{DynamicResource AccentBrush}"
@@ -333,7 +330,6 @@
                                             </Style.Triggers>
                                         </Style>
                                     </StackPanel.Style>
-                                    <TextBlock Text="⛔" FontSize="24" VerticalAlignment="Center" Margin="0,0,12,0"/>
                                     <TextBlock Text=".log 또는 .txt 파일 1개만 드롭할 수 있습니다"
                                                FontSize="14" FontWeight="SemiBold"
                                                Foreground="Crimson" VerticalAlignment="Center"/>
@@ -362,7 +358,7 @@
                                                 <Button.Template>
                                                     <ControlTemplate TargetType="Button">
                                                         <Border x:Name="Bd" Background="Transparent"
-                                                                CornerRadius="4" Padding="10,6" Margin="0,0,0,2">
+                                                                CornerRadius="2" Padding="10,6" Margin="0,0,0,2">
                                                             <Grid>
                                                                 <Grid.ColumnDefinitions>
                                                                     <ColumnDefinition Width="*"/>
@@ -455,20 +451,20 @@
 
                 <!-- Left: Title + load buttons -->
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="📋 Log Viewer" FontSize="16" FontWeight="Bold"
+                    <TextBlock Text="Log Viewer" FontSize="16" FontWeight="Bold"
                                Foreground="{DynamicResource ForegroundBrush}" VerticalAlignment="Center"
                                Margin="0,0,20,0"/>
-                    <Button Content="⏮ 처음으로" Style="{StaticResource SecondaryButton}"
+                    <Button Content="처음으로" Style="{StaticResource SecondaryButton}"
                             Command="{Binding ResetToStartupCommand}" Margin="0,0,8,0"
                             ToolTip="파일 선택 화면으로 돌아가기"/>
-                    <Button Content="🔄 새로고침 (F5)" Style="{StaticResource SecondaryButton}"
+                    <Button Content="새로고침 (F5)" Style="{StaticResource SecondaryButton}"
                             Command="{Binding RefreshFilesCommand}" Margin="0,0,8,0"
                             ToolTip="현재 불러온 파일을 다시 읽습니다"/>
-                    <Button Content="🔎 로그 검색  (Ctrl+Shift+F)" Style="{StaticResource SecondaryButton}"
+                    <Button Content="로그 검색 (Ctrl+Shift+F)" Style="{StaticResource SecondaryButton}"
                             Click="OpenSearch_Click"
                             ToolTip="로드된 전체 로그에서 찾기 (제외 조건과 무관)"/>
                     <!-- Loaded file count badge -->
-                    <Border Background="{DynamicResource AccentBrush}" CornerRadius="10"
+                    <Border Background="{DynamicResource AccentBrush}" CornerRadius="3"
                             Padding="8,3" Margin="12,0,0,0" VerticalAlignment="Center"
                             Visibility="{Binding LoadedFiles.Count, Converter={StaticResource IntGtZeroToVis}}">
                         <TextBlock Foreground="White" FontSize="11" FontWeight="Bold">
@@ -482,10 +478,10 @@
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                     <Button Style="{StaticResource SecondaryButton}"
                             Command="{Binding ToggleDarkModeCommand}" Padding="10,6">
-                        <Grid Width="18">
-                            <TextBlock Text="🌙" HorizontalAlignment="Center"
+                        <Grid>
+                            <TextBlock Text="다크 모드" HorizontalAlignment="Center"
                                        Visibility="{Binding IsDarkMode, Converter={StaticResource InvBoolToVis}}"/>
-                            <TextBlock Text="☀" HorizontalAlignment="Center"
+                            <TextBlock Text="라이트 모드" HorizontalAlignment="Center"
                                        Visibility="{Binding IsDarkMode, Converter={StaticResource BoolToVis}}"/>
                         </Grid>
                     </Button>
@@ -514,13 +510,13 @@
                         <!-- List header bar -->
                         <Border Grid.Row="0" Background="{DynamicResource SurfaceAltBrush}"
                                 BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1"
-                                Padding="12,7" CornerRadius="6,6,0,0">
+                                Padding="12,7" CornerRadius="3,3,0,0">
                             <StackPanel>
                                 <Grid Margin="0,0,0,6">
                                     <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="📋  로그 목록" FontWeight="Bold"
+                                        <TextBlock Text="로그 목록" FontWeight="Bold"
                                                    Foreground="{DynamicResource ForegroundBrush}"/>
-                                        <Border Background="{DynamicResource AccentBrush}" CornerRadius="8"
+                                        <Border Background="{DynamicResource AccentBrush}" CornerRadius="3"
                                                 Padding="7,2" Margin="10,0,0,0" VerticalAlignment="Center">
                                             <TextBlock FontSize="11" FontWeight="Bold" Foreground="White">
                                                 <Run Text="{Binding FilteredCount, Mode=OneWay}"/>
@@ -580,7 +576,7 @@
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate>
                                                     <Border Background="{DynamicResource AccentBrush}"
-                                                            CornerRadius="10" Margin="0,0,4,4" Padding="8,2">
+                                                            CornerRadius="3" Margin="0,0,4,4" Padding="8,2">
                                                         <StackPanel Orientation="Horizontal">
                                                             <TextBlock Text="{Binding Keyword}"
                                                                        Foreground="White" FontSize="11"
@@ -626,7 +622,7 @@
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate>
                                                     <Border Background="{DynamicResource ErrorBrush}"
-                                                            CornerRadius="10" Margin="0,0,4,4" Padding="8,2">
+                                                            CornerRadius="3" Margin="0,0,4,4" Padding="8,2">
                                                         <StackPanel Orientation="Horizontal">
                                                             <TextBlock Text="{Binding Keyword}"
                                                                        Foreground="White" FontSize="11"
@@ -778,8 +774,6 @@
                             <!-- Empty state -->
                             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"
                                         Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVis}}">
-                                <TextBlock Text="📂" FontSize="48" HorizontalAlignment="Center"
-                                           Opacity="0.3" Margin="0,0,0,12"/>
                                 <TextBlock Text="로그 파일을 추가하거나 제외 조건을 조정하세요"
                                            FontSize="15" Foreground="{DynamicResource ForegroundMutedBrush}"
                                            HorizontalAlignment="Center"/>
@@ -799,7 +793,7 @@
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
                         <TextBlock Grid.Row="0" Style="{StaticResource SectionHeader}">
-                            <Run Text="📄  "/>
+                            
                             <Run Text="{Binding SelectedEntry.TimestampDisplay, Mode=OneWay}"/>
                             <Run Text="  "/>
                             <Run Text="{Binding SelectedEntry.LevelDisplay, Mode=OneWay}"

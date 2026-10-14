@@ -21,7 +21,7 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}" CornerRadius="4"
+                        <Border Background="{TemplateBinding Background}" CornerRadius="2"
                                 Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
@@ -193,11 +193,11 @@
         </Border>
 
         <Border Grid.Row="3" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
-                CornerRadius="4" Margin="0,0,0,12">
+                CornerRadius="2" Margin="0,0,0,12">
             <DockPanel>
                 <Border DockPanel.Dock="Top" Background="{DynamicResource SurfaceAltBrush}"
                         BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1"
-                        Padding="10,6" CornerRadius="4,4,0,0">
+                        Padding="10,6" CornerRadius="2,2,0,0">
                     <TextBlock Text="{Binding ResultSummary}" FontWeight="SemiBold"/>
                 </Border>
                 <ListView x:Name="ResultsList"
