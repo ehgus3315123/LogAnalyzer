@@ -23,7 +23,18 @@ namespace LogViewer
         /// <summary>로그 원문에 적힌 시각 문자열 그대로.</summary>
         public string TimestampText { get; set; }
         public string TimestampDisplay => TimestampText ?? string.Empty;
-        public string TimeDisplay => TimestampDisplay;
+
+        // ponytail: 목록 컬럼(폭 100)이 좁아 "2026-10-20 09:00:25"가 잘린다.
+        // 목록엔 시간만, 전체(날짜 포함)는 TimestampDisplay로 상세/복사/툴팁에서 쓴다.
+        public string TimeDisplay
+        {
+            get
+            {
+                var t = TimestampText ?? string.Empty;
+                int i = t.IndexOfAny(new[] { ' ', 'T' });
+                return i > 0 && i + 1 < t.Length ? t.Substring(i + 1) : t;
+            }
+        }
 
         public string LevelDisplay =>
             _levelDisplay ?? (_levelDisplay = string.IsNullOrEmpty(_level) ? "INFO" : _level.ToUpperInvariant());

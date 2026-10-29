@@ -348,6 +348,8 @@
                                     <TextBlock Text="최근 열었던 파일" Style="{StaticResource SectionHeader}"
                                                Margin="0" VerticalAlignment="Center"/>
                                 </DockPanel>
+                                <ScrollViewer MaxHeight="260" VerticalScrollBarVisibility="Auto"
+                                              HorizontalScrollBarVisibility="Disabled">
                                 <ItemsControl ItemsSource="{Binding RecentFiles}">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
@@ -393,6 +395,7 @@
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
+                                </ScrollViewer>
                             </StackPanel>
                         </Border>
                     </StackPanel>
@@ -717,7 +720,8 @@
                                         <GridViewColumn Header="시각" Width="100">
                                             <GridViewColumn.CellTemplate>
                                                 <DataTemplate>
-                                                    <TextBlock Text="{Binding TimestampDisplay, Mode=OneTime}"
+                                                    <TextBlock Text="{Binding TimeDisplay, Mode=OneTime}"
+                                                               ToolTip="{Binding TimestampDisplay, Mode=OneTime}"
                                                                FontFamily="맑은 고딕" FontSize="12" Padding="4,3"/>
                                                 </DataTemplate>
                                             </GridViewColumn.CellTemplate>
@@ -774,7 +778,7 @@
                             <!-- Empty state -->
                             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"
                                         Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVis}}">
-                                <TextBlock Text="로그 파일을 추가하거나 제외 조건을 조정하세요"
+                                <TextBlock Text="{Binding EmptyMessage}"
                                            FontSize="15" Foreground="{DynamicResource ForegroundMutedBrush}"
                                            HorizontalAlignment="Center"/>
                             </StackPanel>

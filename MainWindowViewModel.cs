@@ -47,7 +47,7 @@ namespace LogViewer
         public IReadOnlyList<LogEntry> FilteredEntries
         {
             get => _filteredEntries;
-            private set { _filteredEntries = value; OnPropertyChanged(); OnPropertyChanged(nameof(FilteredCount)); OnPropertyChanged(nameof(IsEmpty)); }
+            private set { _filteredEntries = value; OnPropertyChanged(); OnPropertyChanged(nameof(FilteredCount)); OnPropertyChanged(nameof(IsEmpty)); OnPropertyChanged(nameof(EmptyMessage)); }
         }
         private CancellationTokenSource _filterCts;
         private bool _isFiltering;
@@ -198,7 +198,12 @@ namespace LogViewer
             set { if (_isDragOverValid == value) return; _isDragOverValid = value; OnPropertyChanged(); }
         }
 
-        public int TotalCount { get => _totalCount; private set { _totalCount = value; OnPropertyChanged(); UpdateStatus(); } }
+        public int TotalCount { get => _totalCount; private set { _totalCount = value; OnPropertyChanged(); OnPropertyChanged(nameof(EmptyMessage)); UpdateStatus(); } }
+
+        // 파일은 로드됐는데 필터로 0건인 경우와, 애초에 빈 경우를 구분해 안내한다.
+        public string EmptyMessage => TotalCount == 0
+            ? "표시할 로그가 없습니다"
+            : $"전체 {TotalCount:N0}건이 로드됐지만 현재 필터에 맞는 로그가 없습니다. 포함/제외/소스 필터를 조정하세요";
         public int ErrorCount { get => _errorCount; private set { _errorCount = value; OnPropertyChanged(); } }
         public int WarnCount { get => _warnCount; private set { _warnCount = value; OnPropertyChanged(); } }
 
